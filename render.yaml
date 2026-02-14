@@ -12,12 +12,16 @@ services:
         value: 0.0.0.0
       - key: APP_PORT
         value: 10000
+      - key: APP_PUBLIC_URL
+        sync: false
       - key: DATABASE_PATH
         value: /tmp/revenue_bot.db
       - key: ADMIN_TOKEN
         generateValue: true
       - key: AUTO_GENERATE_INTERVAL_MINUTES
         value: 60
+      - key: STRIPE_SECRET_KEY
+        sync: false
       - key: STRIPE_WEBHOOK_SECRET
         sync: false
       - key: PAYPAL_CLIENT_ID

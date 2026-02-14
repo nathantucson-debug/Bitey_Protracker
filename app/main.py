@@ -6,12 +6,12 @@ import os
 import random
 import sqlite3
 import threading
-import time
 import uuid
 from datetime import datetime, timezone
+from urllib.error import HTTPError, URLError
 from urllib import parse, request
 
-from flask import Flask, jsonify, render_template, request as flask_request
+from flask import Flask, jsonify, redirect, render_template, request as flask_request
 
 APP_HOST = os.getenv("APP_HOST", "0.0.0.0")
 APP_PORT = int(os.getenv("PORT", os.getenv("APP_PORT", "8080")))
@@ -19,6 +19,8 @@ DATABASE_PATH = os.getenv("DATABASE_PATH", "data/revenue_bot.db")
 ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "change-me")
 AUTO_GENERATE_INTERVAL_MINUTES = int(os.getenv("AUTO_GENERATE_INTERVAL_MINUTES", "60"))
 STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "")
+STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "")
+APP_PUBLIC_URL = os.getenv("APP_PUBLIC_URL", "")
 PAYPAL_CLIENT_ID = os.getenv("PAYPAL_CLIENT_ID", "")
 PAYPAL_CLIENT_SECRET = os.getenv("PAYPAL_CLIENT_SECRET", "")
 PAYPAL_ENV = os.getenv("PAYPAL_ENV", "sandbox")
@@ -102,8 +104,7 @@ def create_product() -> dict:
     price_cents = random.choice([900, 1200, 1500, 1900, 2500])
     product_id = str(uuid.uuid4())
 
-    # Replace this with a real Stripe checkout link in production.
-    checkout_url = f"https://example.com/checkout/{product_id}"
+    checkout_url = f"/checkout/{product_id}"
 
     conn = db()
     conn.execute(
@@ -132,6 +133,60 @@ def list_products(active_only: bool = True) -> list[dict]:
         ).fetchall()
     conn.close()
     return [dict(r) for r in rows]
+
+
+def get_product(product_id: str) -> dict | None:
+    conn = db()
+    row = conn.execute(
+        "SELECT id, title, price_cents, checkout_url, created_at FROM products WHERE id = ? AND active = 1",
+        (product_id,),
+    ).fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def public_base_url() -> str:
+    configured = APP_PUBLIC_URL.strip()
+    if configured:
+        return configured.rstrip("/")
+    return flask_request.url_root.rstrip("/")
+
+
+def create_stripe_checkout_session(product: dict, venmo_handle: str) -> str:
+    if not STRIPE_SECRET_KEY:
+        raise ValueError("missing STRIPE_SECRET_KEY")
+
+    base_url = public_base_url()
+    payload: list[tuple[str, str]] = [
+        ("mode", "payment"),
+        ("success_url", f"{base_url}/?checkout=success"),
+        ("cancel_url", f"{base_url}/?checkout=cancel"),
+        ("line_items[0][price_data][currency]", "usd"),
+        ("line_items[0][price_data][unit_amount]", str(product["price_cents"])),
+        ("line_items[0][price_data][product_data][name]", product["title"]),
+        ("line_items[0][quantity]", "1"),
+        ("metadata[product_id]", product["id"]),
+    ]
+
+    if venmo_handle:
+        payload.append(("metadata[venmo_handle]", venmo_handle))
+
+    body = parse.urlencode(payload).encode("utf-8")
+    req = request.Request(
+        "https://api.stripe.com/v1/checkout/sessions",
+        data=body,
+        headers={
+            "Authorization": f"Bearer {STRIPE_SECRET_KEY}",
+            "Content-Type": "application/x-www-form-urlencoded",
+        },
+        method="POST",
+    )
+    with request.urlopen(req, timeout=20) as resp:
+        data = json.loads(resp.read().decode("utf-8"))
+        session_url = data.get("url", "")
+        if not session_url:
+            raise ValueError("stripe response missing session URL")
+        return session_url
 
 
 def upsert_sale_and_payout(event: dict) -> tuple[str, str]:
@@ -301,6 +356,26 @@ def health():
 @app.get("/api/products")
 def api_products():
     return jsonify({"products": list_products()})
+
+
+@app.get("/checkout/<product_id>")
+def checkout(product_id: str):
+    product = get_product(product_id)
+    if not product:
+        return jsonify({"error": "product not found"}), 404
+
+    venmo_handle = (flask_request.args.get("venmo_handle") or "").strip()
+    try:
+        session_url = create_stripe_checkout_session(product, venmo_handle)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 503
+    except HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="ignore")
+        return jsonify({"error": "stripe api error", "detail": detail}), 502
+    except URLError as exc:
+        return jsonify({"error": "stripe network error", "detail": str(exc)}), 502
+
+    return redirect(session_url, code=302)
 
 
 @app.post("/admin/generate")
