@@ -994,7 +994,9 @@ def handle_post_purchase_delivery(event: dict, sale_id: str) -> tuple[bool, str]
     lines.extend(
         [
             "",
-            "If you need support or a refund request, reply to this email within 7 days.",
+            "Support policy: 7-day satisfaction guarantee with one store-credit request per payment.",
+            "Store credit is issued for the full purchase amount and can be redeemed toward another product.",
+            "To request it, reply to this email within 7 days of purchase.",
             "",
             "Northstar Studio",
         ]
