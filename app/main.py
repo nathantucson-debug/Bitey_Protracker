@@ -932,6 +932,11 @@ def b64url(data: bytes) -> str:
     return base64.urlsafe_b64encode(data).decode("utf-8").rstrip("=")
 
 
+def b64url_decode(data: str) -> bytes:
+    padding = "=" * ((4 - len(data) % 4) % 4)
+    return base64.urlsafe_b64decode(data + padding)
+
+
 def utc_iso_from_epoch(epoch_seconds: int) -> str:
     return datetime.fromtimestamp(epoch_seconds, tz=timezone.utc).isoformat()
 
@@ -1305,6 +1310,32 @@ def verify_shopify_hmac(args_dict, shared_secret: str) -> bool:
     message = "&".join(pairs)
     digest = hmac.new(shared_secret.encode("utf-8"), message.encode("utf-8"), hashlib.sha256).hexdigest()
     return hmac.compare_digest(digest, given)
+
+
+def make_signed_oauth_state(provider: str, payload: dict, secret: str) -> str:
+    body = {"provider": provider, "ts": int(datetime.now(timezone.utc).timestamp()), **payload}
+    payload_b64 = b64url(json.dumps(body, separators=(",", ":")).encode("utf-8"))
+    signature = hmac.new(secret.encode("utf-8"), payload_b64.encode("utf-8"), hashlib.sha256).hexdigest()
+    return f"{payload_b64}.{signature}"
+
+
+def parse_signed_oauth_state(state: str, secret: str, max_age_seconds: int = 900) -> dict | None:
+    parts = (state or "").split(".", 1)
+    if len(parts) != 2:
+        return None
+    payload_b64, provided_sig = parts
+    expected_sig = hmac.new(secret.encode("utf-8"), payload_b64.encode("utf-8"), hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(expected_sig, provided_sig):
+        return None
+    try:
+        body = json.loads(b64url_decode(payload_b64).decode("utf-8"))
+    except Exception:
+        return None
+    ts = int(body.get("ts") or 0)
+    now_ts = int(datetime.now(timezone.utc).timestamp())
+    if ts <= 0 or (now_ts - ts) > max_age_seconds:
+        return None
+    return body
 
 
 def exchange_shopify_oauth_code(shop: str, code: str) -> dict:
@@ -2020,8 +2051,7 @@ def connect_shopify():
     if not shop:
         return jsonify({"error": "missing shop parameter", "example": "/connect/shopify?shop=your-store.myshopify.com"}), 400
 
-    state = str(uuid.uuid4())
-    save_oauth_state("shopify", state, shop)
+    state = make_signed_oauth_state("shopify", {"shop": shop}, SHOPIFY_CLIENT_SECRET)
     params = {
         "client_id": SHOPIFY_CLIENT_ID,
         "scope": SHOPIFY_SCOPES,
@@ -2044,8 +2074,9 @@ def connect_shopify_callback():
     if not verify_shopify_hmac(flask_request.args, SHOPIFY_CLIENT_SECRET):
         return jsonify({"error": "invalid shopify hmac"}), 400
 
-    expected_shop = consume_oauth_state("shopify", state)
-    if not expected_shop or normalize_shop_domain(expected_shop) != shop:
+    state_payload = parse_signed_oauth_state(state, SHOPIFY_CLIENT_SECRET, max_age_seconds=900)
+    expected_shop = normalize_shop_domain((state_payload or {}).get("shop", ""))
+    if not state_payload or (state_payload.get("provider") != "shopify") or expected_shop != shop:
         return jsonify({"error": "invalid oauth state"}), 400
 
     try:
