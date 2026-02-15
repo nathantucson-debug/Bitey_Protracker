@@ -40,9 +40,73 @@ DIGITAL_PRODUCT_BLUEPRINTS = [
     "Social media caption template pack",
 ]
 
+PRODUCT_DETAILS = {
+    "Notion productivity template pack": {
+        "description": "A ready-to-use Notion setup to organize tasks, weekly planning, and habit tracking.",
+        "preview_items": [
+            "Daily planner and weekly review boards",
+            "Habit tracker and goal dashboard",
+            "Project tracker with status templates",
+        ],
+    },
+    "Resume and cover letter kit": {
+        "description": "Professional resume and cover letter templates designed for fast customization.",
+        "preview_items": [
+            "ATS-friendly resume template",
+            "3 customizable cover letter formats",
+            "Keyword optimization checklist",
+        ],
+    },
+    "Small business invoice template bundle": {
+        "description": "Invoice and payment request templates for freelancers and small businesses.",
+        "preview_items": [
+            "Simple and branded invoice layouts",
+            "Late fee and payment terms examples",
+            "Recurring invoice template",
+        ],
+    },
+    "Meal prep planner bundle": {
+        "description": "Plan weekly meals, shopping lists, and prep schedules in one printable bundle.",
+        "preview_items": [
+            "7-day meal planning sheets",
+            "Auto-fill grocery checklist format",
+            "Batch-cooking prep timeline",
+        ],
+    },
+    "Freelancer outreach email pack": {
+        "description": "Cold outreach and follow-up email templates for client acquisition.",
+        "preview_items": [
+            "First-touch outreach templates",
+            "Follow-up sequence examples",
+            "Personalization framework",
+        ],
+    },
+    "Social media caption template pack": {
+        "description": "Caption ideas and content structures for consistent posting across platforms.",
+        "preview_items": [
+            "30 call-to-action caption starters",
+            "Short-form and long-form variants",
+            "Engagement prompt templates",
+        ],
+    },
+}
+
 
 def utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def enrich_product(product: dict) -> dict:
+    details = PRODUCT_DETAILS.get(product.get("title", ""), {})
+    product["description"] = details.get(
+        "description",
+        "Digital product template bundle with editable files and instant access after payment.",
+    )
+    product["preview_items"] = details.get(
+        "preview_items",
+        ["Editable templates", "Step-by-step usage notes", "Instant digital delivery"],
+    )
+    return product
 
 
 def db() -> sqlite3.Connection:
@@ -113,12 +177,12 @@ def create_product() -> dict:
     )
     conn.commit()
     conn.close()
-    return {
+    return enrich_product({
         "id": product_id,
         "title": title,
         "price_cents": price_cents,
         "checkout_url": checkout_url,
-    }
+    })
 
 
 def list_products(active_only: bool = True) -> list[dict]:
@@ -132,7 +196,7 @@ def list_products(active_only: bool = True) -> list[dict]:
             "SELECT id, title, price_cents, checkout_url, created_at, active FROM products ORDER BY created_at DESC"
         ).fetchall()
     conn.close()
-    return [dict(r) for r in rows]
+    return [enrich_product(dict(r)) for r in rows]
 
 
 def get_product(product_id: str) -> dict | None:
@@ -142,7 +206,7 @@ def get_product(product_id: str) -> dict | None:
         (product_id,),
     ).fetchone()
     conn.close()
-    return dict(row) if row else None
+    return enrich_product(dict(row)) if row else None
 
 
 def public_base_url() -> str:

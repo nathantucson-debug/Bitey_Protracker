@@ -34,6 +34,8 @@
       font-size: 1.5rem;
       margin: 0.5rem 0 1rem 0;
     }
+    .desc { color: var(--muted); }
+    ul { margin-top: 0.4rem; }
     label { display: block; margin: 0.5rem 0; color: var(--muted); }
     input {
       width: 100%;
@@ -61,7 +63,14 @@
   <main>
     <section class="card">
       <h1>{{ product.title }}</h1>
+      <p class="desc">{{ product.description }}</p>
       <p class="price">${{ "%.2f"|format(product.price_cents / 100) }}</p>
+      <h3>What you get</h3>
+      <ul>
+        {% for item in product.preview_items %}
+        <li>{{ item }}</li>
+        {% endfor %}
+      </ul>
       <form action="/checkout/{{ product.id }}" method="GET">
         <label for="venmo">Buyer Venmo handle (optional, for payout metadata)</label>
         <input id="venmo" name="venmo_handle" placeholder="@yourhandle">

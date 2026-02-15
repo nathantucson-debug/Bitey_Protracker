@@ -40,6 +40,10 @@
       font-size: 1.4rem;
       margin: 0.5rem 0 1rem 0;
     }
+    .desc {
+      color: var(--muted);
+      min-height: 3.2rem;
+    }
     .btn {
       display: inline-block;
       background: var(--accent);
@@ -59,6 +63,7 @@
       {% for p in products %}
       <section class="card">
         <h2>{{ p.title }}</h2>
+        <p class="desc">{{ p.description }}</p>
         <p class="price">${{ "%.2f"|format(p.price_cents / 100) }}</p>
         <a class="btn" href="/products/{{ p.id }}">View Product</a>
         <p class="muted">ID: {{ p.id }}</p>
