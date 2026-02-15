@@ -338,7 +338,216 @@ def enrich_product(product: dict) -> dict:
     product["theme_end"] = theme_end
     slug = slugify(product.get("title", "product"))
     product["cover_image"] = f"/static/covers/{slug}.svg"
+    product["real_world_preview"] = real_world_preview(product.get("title", ""))
     return product
+
+
+def real_world_preview(title: str) -> dict:
+    previews = {
+        "Creator Caption Vault": {
+            "headline": "Sample Deliverable: 7-Day Instagram Caption Plan",
+            "subhead": "A buyer-ready posting schedule with hook, value angle, and CTA.",
+            "columns": ["Day", "Hook", "Post Angle", "CTA"],
+            "rows": [
+                ["Mon", "Nobody tells you this about growth", "Myth vs reality breakdown", "Comment 'map'"],
+                ["Tue", "If your content stalls at 300 views", "3 retention fixes", "Save this"],
+                ["Wed", "The easiest conversion mistake to fix", "CTA rewrite examples", "DM 'rewrite'"],
+                ["Thu", "Steal this post structure", "Hook -> proof -> step", "Share with a creator"],
+            ],
+            "result": "Outcome: publish 4 high-intent posts with clear conversion goals this week.",
+        },
+        "Short-Form Hook Library": {
+            "headline": "Sample Deliverable: Reels Hook Sheet",
+            "subhead": "Real opening lines grouped by awareness level and audience intent.",
+            "columns": ["Audience Stage", "Hook Example", "Use Case"],
+            "rows": [
+                ["Problem aware", "You're not stuck, your first line is.", "Coaching/education"],
+                ["Solution aware", "Most creators use this tactic backwards.", "Marketing tips"],
+                ["Product aware", "Before you buy another course, fix this first.", "Offer positioning"],
+                ["Ready to act", "Copy this script for today's post.", "Template/prompt product"],
+            ],
+            "result": "Outcome: faster scriptwriting and stronger watch-time from the first 3 seconds.",
+        },
+        "UGC Pitch Deck Kit": {
+            "headline": "Sample Deliverable: UGC Offer Page",
+            "subhead": "A client-facing package slide that clarifies scope and pricing.",
+            "columns": ["Package", "Deliverables", "Turnaround", "Price"],
+            "rows": [
+                ["Starter", "3 vertical videos", "5 business days", "$450"],
+                ["Growth", "6 vertical videos + hooks", "7 business days", "$850"],
+                ["Scale", "10 videos + usage rights", "10 business days", "$1,450"],
+            ],
+            "result": "Outcome: cleaner proposals and fewer pricing back-and-forth messages.",
+        },
+        "Notion Operator System": {
+            "headline": "Sample Deliverable: Weekly Operator Dashboard",
+            "subhead": "A practical snapshot used to run one business week with focus.",
+            "columns": ["Priority", "Owner", "Status", "Next Action"],
+            "rows": [
+                ["Launch lead magnet", "You", "In progress", "Draft checkout page"],
+                ["Client onboarding revamp", "You", "Blocked", "Approve form questions"],
+                ["Content sprint", "You", "Scheduled", "Record 3 videos Tuesday"],
+                ["Finance check-in", "You", "Done", "Export monthly report"],
+            ],
+            "result": "Outcome: fewer open loops and clearer execution day to day.",
+        },
+        "Budget & Cashflow Spreadsheet Pro": {
+            "headline": "Sample Deliverable: 30-Day Cashflow Snapshot",
+            "subhead": "How buyers track income, expenses, and runway in one view.",
+            "columns": ["Category", "Planned", "Actual", "Variance"],
+            "rows": [
+                ["Revenue", "$6,500", "$6,200", "-$300"],
+                ["Operating costs", "$1,950", "$1,760", "+$190"],
+                ["Owner pay", "$2,200", "$2,200", "$0"],
+                ["Net cash movement", "$2,350", "$2,240", "-$110"],
+            ],
+            "result": "Outcome: immediate visibility into spending leaks and profit decisions.",
+        },
+        "Resume + Interview Kit": {
+            "headline": "Sample Deliverable: Achievement-Focused Resume Section",
+            "subhead": "Exactly how a bullet is rewritten for stronger recruiter impact.",
+            "columns": ["Before", "After", "Why It Performs Better"],
+            "rows": [
+                ["Managed campaigns", "Increased qualified leads 34% in 2 quarters", "Quantifies business impact"],
+                ["Handled clients", "Owned 22 SMB accounts with 96% retention", "Shows scope + result"],
+                ["Improved process", "Cut turnaround time from 5 days to 2 days", "Makes improvement measurable"],
+            ],
+            "result": "Outcome: stronger interview callbacks with outcome-first positioning.",
+        },
+        "Freelance Client Pack": {
+            "headline": "Sample Deliverable: Scope + Payment Terms Page",
+            "subhead": "A real section clients see before they sign.",
+            "columns": ["Clause", "Sample Language", "Protection"],
+            "rows": [
+                ["Project scope", "Includes 3 landing page sections and mobile optimization.", "Limits scope creep"],
+                ["Revision policy", "Two revision rounds included within 10 days of delivery.", "Controls rework"],
+                ["Payment terms", "50% upfront, 50% before final files are released.", "Protects cashflow"],
+            ],
+            "result": "Outcome: fewer disputes, clearer expectations, faster payment cycles.",
+        },
+        "Wedding Invite Suite (Canva)": {
+            "headline": "Sample Deliverable: Invitation + RSVP Set",
+            "subhead": "A polished wording layout couples personalize in minutes.",
+            "columns": ["Card", "Sample Wording", "Format"],
+            "rows": [
+                ["Main invite", "Together with their families, Ava and Liam invite you...", "5x7 print"],
+                ["RSVP", "Kindly reply by September 12. Meal selection included.", "A2 card"],
+                ["Details card", "Ceremony 4:00 PM, reception to follow at Lakeside Hall.", "A2 card"],
+            ],
+            "result": "Outcome: consistent, elegant stationery without custom design fees.",
+        },
+        "Airbnb Host Welcome Book": {
+            "headline": "Sample Deliverable: Guest Arrival Page",
+            "subhead": "A practical first page that reduces repetitive host messages.",
+            "columns": ["Section", "Sample Content", "Guest Benefit"],
+            "rows": [
+                ["Wi-Fi", "Network: CasaStay_5G | Password: Welcome2026", "Instant connection"],
+                ["Check-out", "11:00 AM. Start dishwasher + lock smart door.", "Clear expectations"],
+                ["Local picks", "Best breakfast: Maple House (7 min walk)", "Better guest experience"],
+            ],
+            "result": "Outcome: fewer support texts and smoother stays.",
+        },
+        "Etsy Listing SEO Toolkit": {
+            "headline": "Sample Deliverable: Etsy Listing Buildout",
+            "subhead": "A keyword-focused structure used for one product listing.",
+            "columns": ["Element", "Sample Entry", "SEO Purpose"],
+            "rows": [
+                ["Title", "Editable Wedding Seating Chart Template, Minimalist Canva", "Intent + specificity"],
+                ["Primary tags", "wedding seating chart, canva template, printable wedding", "Search discoverability"],
+                ["First description line", "Plan your seating in minutes with this editable Canva file.", "Conversion clarity"],
+            ],
+            "result": "Outcome: improved listing clarity and stronger search alignment.",
+        },
+        "Meal Prep Planner + Grocery System": {
+            "headline": "Sample Deliverable: 5-Day Meal + Grocery Plan",
+            "subhead": "A realistic weekly setup that cuts decision fatigue.",
+            "columns": ["Day", "Lunch", "Dinner", "Prep Note"],
+            "rows": [
+                ["Mon", "Chicken rice bowl", "Turkey chili", "Batch cook protein Sunday"],
+                ["Tue", "Chicken rice bowl", "Sheet pan salmon", "Use pre-cut vegetables"],
+                ["Wed", "Greek wrap", "Turkey chili", "Repurpose leftovers"],
+                ["Thu", "Greek wrap", "Veggie pasta", "Prep sauce in advance"],
+                ["Fri", "Burrito bowl", "Family pizza night", "Low-prep finish"],
+            ],
+            "result": "Outcome: 4-6 hours saved weekly and fewer impulse takeout orders.",
+        },
+        "Kids Chore & Reward Chart Pack": {
+            "headline": "Sample Deliverable: Family Chore Tracker (Age 7-10)",
+            "subhead": "A real weekly board parents print and place on the fridge.",
+            "columns": ["Task", "Mon", "Tue", "Wed", "Thu", "Fri", "Points"],
+            "rows": [
+                ["Make bed", "✓", "✓", "✓", "✓", "✓", "5"],
+                ["Homework done", "✓", "✓", "○", "✓", "✓", "4"],
+                ["Feed pet", "✓", "✓", "✓", "○", "✓", "4"],
+                ["Evening cleanup", "○", "✓", "✓", "✓", "○", "3"],
+            ],
+            "result": "Outcome: 16 points earned -> Friday reward selected by the child.",
+        },
+        "SOP Manual for Small Teams": {
+            "headline": "Sample Deliverable: Client Onboarding SOP",
+            "subhead": "A true step-by-step process page used by small agencies.",
+            "columns": ["Step", "Owner", "Target SLA", "QA Check"],
+            "rows": [
+                ["Kickoff call scheduled", "Account manager", "24 hours", "Invite + agenda sent"],
+                ["Intake form completed", "Client", "48 hours", "Required fields complete"],
+                ["Workspace setup", "Operations", "24 hours", "Access + naming rules verified"],
+                ["Welcome email sent", "Account manager", "Same day", "Timeline + next steps included"],
+            ],
+            "result": "Outcome: repeatable onboarding with fewer missed handoffs.",
+        },
+        "Course Launch Planner": {
+            "headline": "Sample Deliverable: Launch Timeline Snapshot",
+            "subhead": "A concrete 14-day sequence used before cart open.",
+            "columns": ["Day", "Channel", "Asset", "Goal"],
+            "rows": [
+                ["-14", "Email", "Waitlist warm-up #1", "Re-engage audience"],
+                ["-10", "Social", "Problem-awareness reel", "Increase intent"],
+                ["-7", "Email", "Case study story", "Build trust"],
+                ["-3", "Live", "Q&A session", "Handle objections"],
+                ["0", "Email + social", "Cart open announcement", "Drive purchases"],
+            ],
+            "result": "Outcome: launch messaging stays coordinated instead of last-minute.",
+        },
+        "Brand Kit + Social Template Bundle": {
+            "headline": "Sample Deliverable: Brand Style Snapshot",
+            "subhead": "What a buyer gets to ensure visual consistency across channels.",
+            "columns": ["Component", "Sample", "Use"],
+            "rows": [
+                ["Primary color", "Navy #10213D", "Headlines + buttons"],
+                ["Secondary color", "Sky #2E8EFF", "Highlights + links"],
+                ["Type system", "H1: Sora Bold | Body: Manrope", "Readability + tone"],
+                ["Post layout", "Hook / value / CTA structure", "Faster content production"],
+            ],
+            "result": "Outcome: brand feels cohesive across social, web, and sales pages.",
+        },
+        "Real Estate Lead Magnet Pack": {
+            "headline": "Sample Deliverable: Buyer Follow-Up Sequence",
+            "subhead": "A real nurture flow used after a lead downloads your guide.",
+            "columns": ["Touchpoint", "Timing", "Message Focus", "CTA"],
+            "rows": [
+                ["Email #1", "Immediately", "Guide delivery + welcome", "Reply with neighborhood"],
+                ["Email #2", "+2 days", "Budget planning checklist", "Book 15-min call"],
+                ["Email #3", "+5 days", "Tour readiness tips", "Share target move date"],
+                ["Email #4", "+8 days", "Local market update", "Request custom shortlist"],
+            ],
+            "result": "Outcome: stronger trust and higher conversion from lead to consult.",
+        },
+    }
+
+    return previews.get(
+        title,
+        {
+            "headline": "Sample Deliverable Preview",
+            "subhead": "A practical look at what buyers receive after checkout.",
+            "columns": ["Module", "What It Includes", "Buyer Outcome"],
+            "rows": [
+                ["Quickstart", "Getting started workflow", "Fast activation"],
+                ["Core Asset", "Editable template files", "Immediate implementation"],
+                ["Optimization", "Checklist + refinements", "Better performance"],
+            ],
+            "result": "Outcome: day-one usability with premium documentation and support assets.",
+        },
+    )
 
 
 def init_db() -> None:

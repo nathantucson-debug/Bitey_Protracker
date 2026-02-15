@@ -33,6 +33,15 @@
     .preview-kicker { font-size:.72rem; font-weight:800; letter-spacing:.06em; color:#335384; text-transform:uppercase; margin-bottom:.35rem; }
     .preview-title { font-size:.92rem; font-weight:800; margin:0 0 .32rem 0; color:#0f172a; }
     .preview-copy { margin:0; color:#4b5563; font-size:.9rem; line-height:1.45; }
+    .artifact { margin-top:.65rem; border:1px solid #d4def1; border-radius:12px; background:#ffffff; overflow:hidden; box-shadow:0 10px 24px rgba(15,23,42,.08); }
+    .artifact-head { padding:.75rem .9rem; background:#f5f8ff; border-bottom:1px solid #dce5f6; }
+    .artifact-head h4 { margin:0 0 .2rem 0; font-size:1rem; }
+    .artifact-head p { margin:0; font-size:.9rem; color:#55627a; }
+    .artifact table { width:100%; border-collapse:collapse; font-size:.9rem; }
+    .artifact th, .artifact td { padding:.55rem .6rem; border-bottom:1px solid #eef2fa; text-align:left; }
+    .artifact th { color:#334155; background:#fbfcff; font-weight:700; }
+    .artifact tbody tr:nth-child(even) { background:#fbfdff; }
+    .artifact-result { padding:.7rem .9rem; background:#f9fbff; color:#1f335a; font-weight:700; }
 
     .status { margin-bottom:.7rem; padding:.6rem .75rem; border-radius:10px; font-size:.92rem; border:1px solid var(--line); background:#f8fbff; }
     .status.ok { color:var(--ok); border-color:#bce4c8; background:#f2fcf5; }
@@ -70,9 +79,35 @@
         <p class="tagline">{{ product.tagline }}</p>
         <p class="desc">{{ product.description }}</p>
         <p class="price">${{ "%.2f"|format(product.price_cents / 100) }}</p>
+        <h3>Real-World Sample</h3>
+        <div class="artifact">
+          <div class="artifact-head">
+            <h4>{{ product.real_world_preview.headline }}</h4>
+            <p>{{ product.real_world_preview.subhead }}</p>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                {% for c in product.real_world_preview.columns %}
+                <th>{{ c }}</th>
+                {% endfor %}
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in product.real_world_preview.rows %}
+              <tr>
+                {% for cell in row %}
+                <td>{{ cell }}</td>
+                {% endfor %}
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          <div class="artifact-result">{{ product.real_world_preview.result }}</div>
+        </div>
         <h3>Included In This Product</h3>
         <ul>{% for item in product.preview_items %}<li>{{ item }}</li>{% endfor %}</ul>
-        <h3>Preview Excerpt</h3>
+        <h3>How Buyers Use It</h3>
         <p class="preview">{{ product.preview_snippet }}</p>
         <div class="preview-grid">
           <article class="preview-card">
@@ -91,6 +126,7 @@
             <p class="preview-copy">{{ product.preview_items[2] if product.preview_items|length > 2 else "Checklist and optimization notes" }}</p>
           </article>
         </div>
+
       </article>
 
       <aside class="card">
