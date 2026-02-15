@@ -36,6 +36,16 @@
     }
     .desc { color: var(--muted); }
     ul { margin-top: 0.4rem; }
+    .preview {
+      background: #f4f7ff;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 0.8rem;
+      white-space: pre-wrap;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.9rem;
+      line-height: 1.35;
+    }
     label { display: block; margin: 0.5rem 0; color: var(--muted); }
     input {
       width: 100%;
@@ -71,6 +81,8 @@
         <li>{{ item }}</li>
         {% endfor %}
       </ul>
+      <h3>Sample Preview</h3>
+      <div class="preview">{{ product.preview_snippet }}</div>
       <form action="/checkout/{{ product.id }}" method="GET">
         <label for="venmo">Buyer Venmo handle (optional, for payout metadata)</label>
         <input id="venmo" name="venmo_handle" placeholder="@yourhandle">

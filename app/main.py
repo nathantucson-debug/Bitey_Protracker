@@ -49,6 +49,7 @@ PRODUCT_DETAILS = {
             "Habit tracker and goal dashboard",
             "Project tracker with status templates",
         ],
+        "preview_snippet": "Weekly Focus\n- Top 3 Outcomes\n- Must-do Tasks\n- Follow-ups\n\nHabit Tracker\nMon Tue Wed Thu Fri Sat Sun\nRead  [ ] [ ] [ ] [ ] [ ] [ ] [ ]",
     },
     "Resume and cover letter kit": {
         "description": "Professional resume and cover letter templates designed for fast customization.",
@@ -57,6 +58,7 @@ PRODUCT_DETAILS = {
             "3 customizable cover letter formats",
             "Keyword optimization checklist",
         ],
+        "preview_snippet": "SUMMARY\nResults-driven [Role] with [X] years in [industry].\n\nEXPERIENCE\n[Company] - [Role]\n- Increased [metric] by [percent]\n- Launched [project] with [outcome]",
     },
     "Small business invoice template bundle": {
         "description": "Invoice and payment request templates for freelancers and small businesses.",
@@ -65,6 +67,7 @@ PRODUCT_DETAILS = {
             "Late fee and payment terms examples",
             "Recurring invoice template",
         ],
+        "preview_snippet": "INVOICE #1042\nBill To: Client Name\nService: Website Audit\nAmount Due: $350.00\nDue Date: 2026-02-22\nPayment Terms: Net 7",
     },
     "Meal prep planner bundle": {
         "description": "Plan weekly meals, shopping lists, and prep schedules in one printable bundle.",
@@ -73,6 +76,7 @@ PRODUCT_DETAILS = {
             "Auto-fill grocery checklist format",
             "Batch-cooking prep timeline",
         ],
+        "preview_snippet": "MONDAY\nBreakfast: Greek yogurt + berries\nLunch: Chicken bowl\nDinner: Salmon + rice\n\nGROCERY\n[ ] chicken breast\n[ ] spinach\n[ ] rice",
     },
     "Freelancer outreach email pack": {
         "description": "Cold outreach and follow-up email templates for client acquisition.",
@@ -81,6 +85,7 @@ PRODUCT_DETAILS = {
             "Follow-up sequence examples",
             "Personalization framework",
         ],
+        "preview_snippet": "Subject: Quick idea for {{company}}\n\nHi {{name}},\nI noticed {{specific_issue}} on {{channel}}.\nI can help improve {{goal}} in 14 days.\nOpen to a 10-min chat this week?",
     },
     "Social media caption template pack": {
         "description": "Caption ideas and content structures for consistent posting across platforms.",
@@ -89,6 +94,7 @@ PRODUCT_DETAILS = {
             "Short-form and long-form variants",
             "Engagement prompt templates",
         ],
+        "preview_snippet": "Hook: Most creators miss this one growth lever.\nValue: Use a 3-part caption: hook, proof, CTA.\nCTA: Comment 'template' and I will send it.",
     },
 }
 
@@ -106,6 +112,10 @@ def enrich_product(product: dict) -> dict:
     product["preview_items"] = details.get(
         "preview_items",
         ["Editable templates", "Step-by-step usage notes", "Instant digital delivery"],
+    )
+    product["preview_snippet"] = details.get(
+        "preview_snippet",
+        "Sample preview unavailable for this item.",
     )
     return product
 
