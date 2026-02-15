@@ -50,7 +50,7 @@ PRODUCT_DETAILS = {
             "Goal tracker with KPI dashboard and status tags",
             "Project pipeline with priority and deadline views",
         ],
-        "preview_snippet": "WEEKLY DASHBOARD\nTop Outcomes:\n1) Launch lead magnet\n2) Publish 3 posts\n3) Close 2 client calls\n\nTODAY VIEW\nMust-do:\n- Draft offer page copy\n- Send 15 outreach DMs\n- Review yesterday metrics",
+        "preview_snippet": "This week I am focused on launching a lead magnet, publishing three posts, and closing two client calls. Today's top tasks are drafting offer copy, sending outreach, and reviewing yesterday's metrics.",
     },
     "Resume and cover letter kit": {
         "description": "Premium resume and cover letter templates designed to help candidates present measurable impact and pass ATS filters.",
@@ -60,7 +60,7 @@ PRODUCT_DETAILS = {
             "3 conversion-focused cover letter frameworks",
             "Role keyword map and tailoring checklist",
         ],
-        "preview_snippet": "EXECUTIVE SUMMARY\nGrowth marketer with 6+ years scaling B2C funnels.\n\nEXPERIENCE\nAcme Labs - Senior Marketing Manager\n- Increased qualified pipeline by 38% in 2 quarters\n- Reduced CAC by 24% through lifecycle segmentation",
+        "preview_snippet": "Growth marketer with 6+ years scaling B2C funnels. At Acme Labs, increased qualified pipeline by 38% in two quarters and reduced CAC by 24% through lifecycle segmentation.",
     },
     "Small business invoice template bundle": {
         "description": "Professional invoice pack for freelancers and service businesses that want to look credible and get paid faster.",
@@ -70,7 +70,7 @@ PRODUCT_DETAILS = {
             "Late fee policy and payment terms templates",
             "Recurring retainer and milestone billing versions",
         ],
-        "preview_snippet": "INVOICE #2047\nBill To: Northstar Design Co.\nService: Conversion Audit + Recommendations\nSubtotal: $1,200.00\nDue Date: 2026-02-22\nTerms: Net 7, 1.5% late fee after due date",
+        "preview_snippet": "Invoice #2047 for Northstar Design Co. Service: Conversion Audit + Recommendations. Subtotal: $1,200. Due date: February 22, 2026. Terms: Net 7 with a 1.5% late fee after due date.",
     },
     "Meal prep planner bundle": {
         "description": "A practical meal planning system that helps busy professionals eat better, reduce food waste, and save time.",
@@ -80,7 +80,7 @@ PRODUCT_DETAILS = {
             "Category-based grocery list template",
             "90-minute Sunday batch prep workflow",
         ],
-        "preview_snippet": "WEEK PLAN (MONDAY)\nBreakfast: Overnight oats + berries\nLunch: Chicken quinoa bowl\nDinner: Salmon, rice, and greens\n\nPREP CHECKLIST\n[ ] Roast protein trays\n[ ] Portion lunch boxes\n[ ] Prep 3 sauces",
+        "preview_snippet": "Monday plan: overnight oats and berries for breakfast, chicken quinoa bowl for lunch, and salmon with rice and greens for dinner. Prep checklist includes roasting protein trays, portioning lunch boxes, and prepping three sauces.",
     },
     "Freelancer outreach email pack": {
         "description": "Client acquisition email pack for freelancers and consultants who want replies without sounding spammy.",
@@ -90,7 +90,7 @@ PRODUCT_DETAILS = {
             "4-step follow-up sequence with timing guide",
             "Personalization prompts that improve response rates",
         ],
-        "preview_snippet": "SUBJECT: Quick idea for {{company}}\n\nHi {{first_name}},\nI noticed {{specific_gap}} on your {{channel}}.\nI mapped a 3-step fix that could improve {{metric}} in 14 days.\nOpen to a 10-minute walkthrough this week?",
+        "preview_snippet": "Subject: Quick idea for your brand. Hi there, I noticed a gap in your current channel strategy and mapped a three-step fix that could improve key performance metrics in 14 days. Open to a 10-minute walkthrough this week?",
     },
     "Social media caption template pack": {
         "description": "Ready-to-publish caption templates for creators, coaches, and small brands who want consistent growth content.",
@@ -100,7 +100,7 @@ PRODUCT_DETAILS = {
             "Short-form and long-form caption formats",
             "Engagement prompts for saves, shares, and comments",
         ],
-        "preview_snippet": "HOOK: Most creators overcomplicate growth.\nVALUE: Use this framework: pain point -> proof -> practical step.\nCTA: Comment \"guide\" and I will send the full structure.",
+        "preview_snippet": "Most creators overcomplicate growth. Use this simple caption framework: identify the pain point, show proof, and give one practical step. End with a clear CTA inviting the audience to comment for the full guide.",
     },
 }
 
