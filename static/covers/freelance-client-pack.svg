@@ -1,13 +1,17 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="720" viewBox="0 0 1200 720" role="img" aria-label="Freelance Client Pack">
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="720" viewBox="0 0 1200 720" role="img" aria-label="Northstar Studio cover">
   <defs>
     <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#7c3aed"/>
-      <stop offset="100%" stop-color="#4f46e5"/>
+      <stop offset="0%" stop-color="#1d4ed8"/>
+      <stop offset="100%" stop-color="#0ea5e9"/>
     </linearGradient>
   </defs>
   <rect width="1200" height="720" fill="url(#g)"/>
-  <rect x="40" y="40" width="1120" height="640" rx="28" fill="rgba(255,255,255,0.10)"/>
-  <text x="80" y="220" fill="white" font-size="42" font-family="Avenir Next,Segoe UI,sans-serif" font-weight="700">Northstar Studio</text>
-  <text x="80" y="320" fill="white" font-size="72" font-family="Avenir Next,Segoe UI,sans-serif" font-weight="800">Freelance Client Pack</text>
-  <text x="80" y="390" fill="white" font-size="30" font-family="Avenir Next,Segoe UI,sans-serif" opacity="0.95">Premium Digital Product</text>
+  <rect x="36" y="36" width="1128" height="648" rx="28" fill="rgba(255,255,255,0.10)"/>
+  <rect x="74" y="104" width="230" height="8" rx="4" fill="rgba(255,255,255,0.65)"/>
+  <rect x="74" y="144" width="560" height="20" rx="10" fill="rgba(255,255,255,0.9)"/>
+  <rect x="74" y="180" width="430" height="20" rx="10" fill="rgba(255,255,255,0.85)"/>
+  <rect x="74" y="236" width="250" height="12" rx="6" fill="rgba(255,255,255,0.55)"/>
+  <rect x="74" y="286" width="1052" height="1" fill="rgba(255,255,255,0.35)"/>
+  <text x="74" y="110" fill="white" font-size="28" font-family="Avenir Next,Segoe UI,sans-serif" font-weight="700">Northstar Studio</text>
+  <text x="74" y="244" fill="white" font-size="26" font-family="Avenir Next,Segoe UI,sans-serif" opacity="0.95">Premium Digital Product</text>
 </svg>

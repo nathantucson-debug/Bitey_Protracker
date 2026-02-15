@@ -19,7 +19,8 @@
     h1 { margin:0 0 .35rem; font-size:2rem; }
     .sub { margin:0 0 .85rem; color:var(--muted); }
     .chips { display:flex; gap:.4rem; flex-wrap:wrap; margin-bottom:.95rem; }
-    .chip { font-size:.78rem; border:1px solid #d1dbef; border-radius:999px; padding:.2rem .55rem; color:#28406e; background:#f2f6ff; font-weight:700; }
+    .chip { font-size:.78rem; border:1px solid #d1dbef; border-radius:999px; padding:.2rem .55rem; color:#28406e; background:#f2f6ff; font-weight:700; text-decoration:none; }
+    .chip.active { background:#0b5bd3; border-color:#0b5bd3; color:#fff; }
 
     .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(255px,1fr)); gap:.9rem; }
     .card { background:#fff; border:1px solid var(--line); border-radius:14px; padding:1rem; display:flex; flex-direction:column; gap:.45rem; min-height:305px; }
@@ -39,7 +40,7 @@
 <body>
   <header>
     <div class="wrap nav">
-      <div class="brand">Northstar Studio <span style="font-weight:600;color:#415b86">your unfair advantage, made simple</span></div>
+      <div class="brand">Northstar Studio</div>
       <a class="btn" href="/">Home</a>
     </div>
   </header>
@@ -49,8 +50,9 @@
     <p class="sub">Every product is structured for immediate use, clear outcomes, and strong value for your spend.</p>
 
     <div class="chips">
+      <a class="chip {% if not selected_category %}active{% endif %}" href="/store">All</a>
       {% for c in categories %}
-      <span class="chip">{{ c }}</span>
+      <a class="chip {% if selected_category == c %}active{% endif %}" href="/store?category={{ c|urlencode }}">{{ c }}</a>
       {% endfor %}
     </div>
 

@@ -956,7 +956,16 @@ def landing():
 def store():
     products = list_products()
     categories = sorted({p["category"] for p in products})
-    return render_template("store.html", products=products, categories=categories, bundles=list_bundles())
+    selected_category = (flask_request.args.get("category") or "").strip()
+    if selected_category:
+        products = [p for p in products if p["category"] == selected_category]
+    return render_template(
+        "store.html",
+        products=products,
+        categories=categories,
+        bundles=list_bundles(),
+        selected_category=selected_category,
+    )
 
 
 @app.get("/products/<product_id>")
