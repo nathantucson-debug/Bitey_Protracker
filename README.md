@@ -16,6 +16,13 @@ It does **not** guarantee instant money. No legal app can reliably guarantee imm
 - Flask
 - SQLite
 
+## Brand + Product Strategy
+
+- Public home page: `/`
+- Public catalog: `/store`
+- Product detail pages: `/products/<product_id>`
+- Market analysis notes: `MARKET_ANALYSIS.md`
+
 ## Quick start
 
 ```bash

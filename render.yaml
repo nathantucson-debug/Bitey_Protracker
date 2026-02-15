@@ -19,9 +19,9 @@ services:
       - key: ADMIN_TOKEN
         generateValue: true
       - key: AUTO_GENERATE_INTERVAL_MINUTES
-        value: 60
+        value: 120
       - key: MIN_STORE_PRODUCTS
-        value: 6
+        value: 12
       - key: STRIPE_SECRET_KEY
         sync: false
       - key: STRIPE_WEBHOOK_SECRET

@@ -3,84 +3,124 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Revenue Bot Store</title>
+  <title>Northstar Studio Catalog</title>
   <style>
     :root {
-      --bg: #f8f9fd;
-      --panel: #ffffff;
-      --line: #d9deeb;
-      --text: #1e2430;
-      --muted: #5d6a85;
-      --accent: #1363df;
+      --ink: #0f172a;
+      --muted: #4b5563;
+      --line: #dbe3f0;
+      --surface: #ffffff;
+      --bg: #f4f7fc;
+      --brand: #0b5bd3;
     }
+    * { box-sizing: border-box; }
     body {
       margin: 0;
-      font-family: "Avenir Next", "Segoe UI", sans-serif;
-      color: var(--text);
-      background: radial-gradient(circle at top right, #e7f0ff, var(--bg));
+      font-family: "Söhne", "Avenir Next", "Segoe UI", sans-serif;
+      color: var(--ink);
+      background: linear-gradient(180deg, #f8fbff 0%, var(--bg) 100%);
     }
-    main {
-      max-width: 1000px;
-      margin: 2rem auto;
-      padding: 0 1rem;
+    .wrap { max-width: 1120px; margin: 0 auto; padding: 0 1rem; }
+    header {
+      border-bottom: 1px solid var(--line);
+      background: rgba(255,255,255,.9);
+      position: sticky;
+      top: 0;
+      backdrop-filter: blur(8px);
+      z-index: 10;
     }
-    h1 { margin: 0 0 1rem 0; }
+    .nav { display: flex; justify-content: space-between; align-items: center; padding: 1rem 0; }
+    .brand { font-weight: 800; }
+    .brand small { color: var(--muted); margin-left: .35rem; font-weight: 600; }
+    .btn {
+      display: inline-block;
+      text-decoration: none;
+      border-radius: 10px;
+      padding: .58rem .9rem;
+      font-weight: 700;
+      border: 1px solid var(--line);
+      color: var(--ink);
+      background: #fff;
+    }
+    .btn.primary { background: var(--brand); color: #fff; border-color: var(--brand); }
+
+    main { padding: 1.5rem 0 2rem; }
+    h1 { margin: 0 0 .35rem; font-size: 2rem; }
+    .sub { margin: 0 0 .9rem; color: var(--muted); }
+
+    .chips { display: flex; gap: .4rem; flex-wrap: wrap; margin-bottom: 1rem; }
+    .chip {
+      font-size: .78rem;
+      border: 1px solid #d1dbef;
+      border-radius: 999px;
+      padding: .2rem .55rem;
+      color: #28406e;
+      background: #f2f6ff;
+      font-weight: 700;
+    }
+
     .grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-      gap: 1rem;
+      grid-template-columns: repeat(auto-fit, minmax(255px, 1fr));
+      gap: .9rem;
     }
     .card {
-      background: var(--panel);
+      background: #fff;
       border: 1px solid var(--line);
       border-radius: 14px;
       padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: .45rem;
+      min-height: 275px;
     }
-    .tag {
-      display: inline-block;
-      font-size: 0.78rem;
+    .cat {
+      align-self: flex-start;
+      font-size: .73rem;
       font-weight: 700;
-      color: #0d4ec9;
-      background: #e8f0ff;
-      border: 1px solid #c5d8ff;
+      background: #eef3ff;
+      color: #194ead;
+      border: 1px solid #d1deff;
       border-radius: 999px;
-      padding: 0.18rem 0.55rem;
-      margin-bottom: 0.55rem;
+      padding: .2rem .5rem;
     }
-    .price {
-      font-size: 1.4rem;
-      margin: 0.5rem 0 1rem 0;
-    }
-    .desc {
-      color: var(--muted);
-      min-height: 3.2rem;
-    }
-    .btn {
-      display: inline-block;
-      background: var(--accent);
-      color: #fff;
-      text-decoration: none;
-      border-radius: 8px;
-      padding: 0.55rem 0.8rem;
-      font-weight: 600;
-    }
-    .muted { color: var(--muted); font-size: 0.9rem; }
+    .title { margin: .2rem 0 .1rem; font-size: 1.05rem; }
+    .tagline { margin: 0; color: #1f355c; font-weight: 700; }
+    .desc { margin: 0; color: var(--muted); line-height: 1.45; }
+    .price { font-size: 1.22rem; font-weight: 800; margin-top: auto; }
+    .row { display: flex; gap: .45rem; flex-wrap: wrap; }
   </style>
 </head>
 <body>
-  <main>
-    <h1>Store</h1>
-    <p><a href="/">Home</a></p>
+  <header>
+    <div class="wrap nav">
+      <div class="brand">Northstar Studio <small>Catalog</small></div>
+      <a class="btn" href="/">Home</a>
+    </div>
+  </header>
+  <main class="wrap">
+    <h1>Digital Product Collection</h1>
+    <p class="sub">Curated, practical assets for business, content, career, and operations workflows.</p>
+
+    <div class="chips">
+      {% for c in categories %}
+      <span class="chip">{{ c }}</span>
+      {% endfor %}
+    </div>
+
     <div class="grid">
       {% for p in products %}
-      <section class="card">
-        <span class="tag">Digital Download</span>
-        <h2>{{ p.title }}</h2>
-        <p><strong>{{ p.tagline }}</strong></p>
+      <article class="card">
+        <span class="cat">{{ p.category }}</span>
+        <h2 class="title">{{ p.title }}</h2>
+        <p class="tagline">{{ p.tagline }}</p>
         <p class="desc">{{ p.description }}</p>
         <p class="price">${{ "%.2f"|format(p.price_cents / 100) }}</p>
-        <a class="btn" href="/products/{{ p.id }}">View Product</a>
-      </section>
+        <div class="row">
+          <a class="btn primary" href="/products/{{ p.id }}">Preview</a>
+          <a class="btn" href="/checkout/{{ p.id }}">Buy</a>
+        </div>
+      </article>
       {% endfor %}
     </div>
   </main>
