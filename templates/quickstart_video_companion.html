@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ order_bump.name }} | Northstar Studio</title>
+  <style>
+    :root { --ink:#111827; --muted:#4b5563; --line:#dbe3f0; --bg:#f4f7fc; --brand:#0b5bd3; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:"Avenir Next","Segoe UI",sans-serif; color:var(--ink); background:linear-gradient(180deg,#f8fbff 0%,var(--bg) 100%); }
+    .wrap { max-width:980px; margin:0 auto; padding:0 1rem; }
+    header { border-bottom:1px solid var(--line); background:rgba(255,255,255,.9); position:sticky; top:0; z-index:10; backdrop-filter:blur(8px); }
+    .nav { display:flex; justify-content:space-between; align-items:center; padding:1rem 0; }
+    .brand { font-weight:800; }
+    .btn { display:inline-block; text-decoration:none; border-radius:10px; padding:.62rem .95rem; font-weight:700; border:1px solid var(--line); color:var(--ink); background:#fff; }
+    .btn.primary { background:var(--brand); color:#fff; border-color:var(--brand); }
+    main { padding:1.5rem 0 2rem; }
+    .hero { background:#fff; border:1px solid var(--line); border-radius:14px; padding:1rem; }
+    h1 { margin:.2rem 0 .5rem; font-size:2rem; }
+    p { color:var(--muted); line-height:1.6; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:.8rem; margin-top:1rem; }
+    .card { background:#fff; border:1px solid var(--line); border-radius:12px; padding:.9rem; }
+    .video { margin-top:1rem; border:1px solid var(--line); border-radius:12px; background:#0f172a; color:#dbe7ff; padding:1rem; }
+    .video h3 { margin:0 0 .5rem 0; color:#fff; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap nav">
+      <div class="brand">Northstar Studio</div>
+      <a class="btn" href="/store">Back to Store</a>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="hero">
+      <h1>{{ order_bump.name }}</h1>
+      <p>This companion is designed to help buyers implement their template purchase faster with less friction. It includes a guided walkthrough and deployment checklist.</p>
+      <a class="btn primary" href="/store">View Core Products</a>
+    </section>
+
+    <section class="grid">
+      <article class="card">
+        <h3>Module 1: Setup</h3>
+        <p>How to install and customize your template in under 20 minutes.</p>
+      </article>
+      <article class="card">
+        <h3>Module 2: Implementation</h3>
+        <p>How to apply the framework to real workflows and avoid common mistakes.</p>
+      </article>
+      <article class="card">
+        <h3>Module 3: Optimization</h3>
+        <p>How to iterate your system for better output, speed, and consistency.</p>
+      </article>
+    </section>
+
+    <section class="video">
+      <h3>Video Access</h3>
+      <p>This page is the access hub for the companion. Replace this block with your hosted video URL when ready.</p>
+      <p>Recommended: Vimeo or Loom private share link + transcript download.</p>
+    </section>
+  </main>
+</body>
+</html>

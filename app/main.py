@@ -781,7 +781,7 @@ def handle_post_purchase_delivery(event: dict, sale_id: str) -> tuple[bool, str]
     if bundle_key:
         lines.append(f"- Bundle access page: {base_url}/bundle/{bundle_key}")
     if order_bump == "yes":
-        lines.append(f"- {ORDER_BUMP['name']}: {base_url}/store")
+        lines.append(f"- {ORDER_BUMP['name']}: {base_url}/quickstart-video-companion")
     lines.extend(
         [
             "",
@@ -1002,6 +1002,11 @@ def bundle_detail(bundle_key: str):
         lead_status=lead_status,
         order_bump=ORDER_BUMP,
     )
+
+
+@app.get("/quickstart-video-companion")
+def quickstart_video_companion():
+    return render_template("quickstart_video_companion.html", order_bump=ORDER_BUMP)
 
 
 @app.get("/admin")
