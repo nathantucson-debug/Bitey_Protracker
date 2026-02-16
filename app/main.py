@@ -2592,10 +2592,29 @@ def admin_qc_page():
     if not admin_guard_any():
         return jsonify({"error": "unauthorized"}), 401
     products = list_products()
+    categories = sorted({p["category"] for p in products})
+    selected_category = (flask_request.args.get("category") or "").strip()
+    sort_key = (flask_request.args.get("sort") or "newest").strip()
+    if selected_category:
+        products = [p for p in products if p.get("category") == selected_category]
+
+    if sort_key == "title_asc":
+        products = sorted(products, key=lambda x: x.get("title", "").lower())
+    elif sort_key == "title_desc":
+        products = sorted(products, key=lambda x: x.get("title", "").lower(), reverse=True)
+    elif sort_key == "price_asc":
+        products = sorted(products, key=lambda x: int(x.get("price_cents", 0)))
+    elif sort_key == "price_desc":
+        products = sorted(products, key=lambda x: int(x.get("price_cents", 0)), reverse=True)
+    else:
+        sort_key = "newest"
     token = admin_token_value()
     return render_template(
         "qc.html",
         products=products,
+        categories=categories,
+        selected_category=selected_category,
+        sort_key=sort_key,
         admin_token_hint=token,
     )
 
@@ -2657,6 +2676,33 @@ def admin_download_product_zip(product_id: str):
     filename = f"{slugify(product.get('title', 'product'))}-qc-pack.zip"
     return Response(
         payload,
+        mimetype="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@app.get("/admin/download/all-qc.zip")
+def admin_download_all_qc_zip():
+    if not admin_guard_any():
+        return jsonify({"error": "unauthorized"}), 401
+    products = list_products()
+    selected_category = (flask_request.args.get("category") or "").strip()
+    if selected_category:
+        products = [p for p in products if p.get("category") == selected_category]
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
+        for p in products:
+            folder = f"{slugify(p.get('title', 'product'))}/"
+            zf.writestr(folder + "qc-pack.zip", build_product_qc_zip(p))
+        zf.writestr(
+            "README.txt",
+            f"Northstar Studio QC master archive\nTotal products: {len(products)}\n"
+            + (f"Category filter: {selected_category}\n" if selected_category else ""),
+        )
+    suffix = f"-{slugify(selected_category)}" if selected_category else ""
+    filename = f"northstar-studio-all-qc{suffix}.zip"
+    return Response(
+        buf.getvalue(),
         mimetype="application/zip",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )

@@ -17,6 +17,9 @@
     .sub { margin:.2rem 0 0 0; color:var(--muted); }
     .btn { display:inline-block; text-decoration:none; border-radius:12px; padding:.55rem .85rem; font-weight:800; border:1px solid var(--line); color:var(--ink); background:#fff; }
     .btn.primary { background:var(--brand); color:#fff; border-color:var(--brand); }
+    .toolbar { display:flex; gap:.5rem; flex-wrap:wrap; align-items:center; margin:.8rem 0 1rem; }
+    .toolbar label { font-size:.85rem; color:#334155; font-weight:700; }
+    .toolbar select { border:1px solid var(--line); border-radius:10px; background:#fff; padding:.45rem .55rem; font-size:.92rem; color:#0f172a; }
     .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(275px,1fr)); gap:.8rem; }
     .card { background:#fff; border:1px solid var(--line); border-radius:14px; padding:.8rem; box-shadow:0 10px 22px rgba(15,23,42,.06); }
     .thumb { width:100%; height:120px; object-fit:cover; border-radius:10px; border:1px solid #dbe5f7; background:#e9effb; margin-bottom:.55rem; }
@@ -36,9 +39,31 @@
       </div>
       <div class="row">
         <a class="btn" href="/admin?admin_token={{ admin_token_hint|urlencode }}">Admin</a>
+        <a class="btn" href="/admin/download/all-qc.zip?admin_token={{ admin_token_hint|urlencode }}{% if selected_category %}&category={{ selected_category|urlencode }}{% endif %}" target="_blank" rel="noopener">Download All QC ZIPs</a>
         <a class="btn primary" href="/admin/download-links?admin_token={{ admin_token_hint|urlencode }}" target="_blank" rel="noopener">Links JSON</a>
       </div>
     </div>
+
+    <form class="toolbar" method="GET" action="/admin/qc">
+      <input type="hidden" name="admin_token" value="{{ admin_token_hint }}">
+      <label for="category">Category</label>
+      <select id="category" name="category">
+        <option value="">All</option>
+        {% for c in categories %}
+        <option value="{{ c }}" {% if selected_category == c %}selected{% endif %}>{{ c }}</option>
+        {% endfor %}
+      </select>
+      <label for="sort">Sort</label>
+      <select id="sort" name="sort">
+        <option value="newest" {% if sort_key == "newest" %}selected{% endif %}>Newest</option>
+        <option value="title_asc" {% if sort_key == "title_asc" %}selected{% endif %}>Title A-Z</option>
+        <option value="title_desc" {% if sort_key == "title_desc" %}selected{% endif %}>Title Z-A</option>
+        <option value="price_asc" {% if sort_key == "price_asc" %}selected{% endif %}>Price Low-High</option>
+        <option value="price_desc" {% if sort_key == "price_desc" %}selected{% endif %}>Price High-Low</option>
+      </select>
+      <button class="btn primary" type="submit">Apply</button>
+      <a class="btn" href="/admin/qc?admin_token={{ admin_token_hint|urlencode }}">Reset</a>
+    </form>
 
     <section class="grid">
       {% for p in products %}
