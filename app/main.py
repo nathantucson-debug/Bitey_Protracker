@@ -1218,21 +1218,76 @@ th{background:#f7faff;color:#1e3a5f}
 
     csv_headers = ["Milestone", "Action Item", "Owner", "Target Date", "Status", "Notes"]
     csv_lines = [",".join(csv_headers)]
-    if included:
-        for idx, item in enumerate(included, 1):
-            csv_lines.append(f"Phase {idx},{item},You,YYYY-MM-DD,Planned,")
-    for row in rows:
-        milestone = str(row[0]) if len(row) > 0 else "Phase"
+    for idx, row in enumerate(rows, 1):
+        milestone = str(row[0]) if len(row) > 0 else f"Phase {idx}"
         action = str(row[1]) if len(row) > 1 else "Implementation step"
-        owner = str(row[2]) if len(row) > 2 else "You"
-        due = str(row[3]) if len(row) > 3 else "YYYY-MM-DD"
-        metric = str(row[4]) if len(row) > 4 else ""
+        owner = str(row[2]) if len(row) > 2 else "Buyer"
+        due = str(row[3]) if len(row) > 3 else f"Day {idx * 2}"
+        if not due or due == "YYYY-MM-DD":
+            due = f"Day {idx * 2}"
+        note = str(row[5]) if len(row) > 5 else (str(row[4]) if len(row) > 4 else "")
         csv_lines.append(
             ",".join(
                 x.replace(",", ";")
-                for x in [milestone, action, owner, due, "In Progress", metric]
+                for x in [milestone, action, owner, due, "Not Started", note]
             )
         )
+
+    sample_headers = [str(c) for c in (preview.get("columns") or ["Step", "Example", "Outcome"])]
+    sample_rows = preview.get("rows") or [
+        ["Step 1", "Set up your first template instance", "Ready to use"],
+        ["Step 2", "Customize with your details", "Draft completed"],
+        ["Step 3", "Run and refine", "Production-ready result"],
+    ]
+    sample_lines = [",".join(h.replace(",", ";") for h in sample_headers)]
+    for row in sample_rows:
+        sample_lines.append(",".join(str(c).replace(",", ";") for c in row))
+
+    asset_slug = slugify(title)
+    master_headers = sample_headers + ["Customization Notes", "Final Version"]
+    master_lines = [",".join(h.replace(",", ";") for h in master_headers)]
+    for row in sample_rows:
+        row_vals = [str(c) for c in row]
+        while len(row_vals) < len(sample_headers):
+            row_vals.append("")
+        row_vals.extend(["", ""])
+        master_lines.append(",".join(c.replace(",", ";") for c in row_vals))
+    master_lines.extend(
+        [
+            ",".join(["", "", "", "", ""]),
+            ",".join(["", "", "", "", ""]),
+        ]
+    )
+
+    plan_lines = ["Day,Primary Task,Deliverable,Success Check,Status"]
+    tasks = included[:] if included else ["Setup core template", "Customize content", "Run first implementation"]
+    for day in range(1, 15):
+        task = tasks[(day - 1) % len(tasks)]
+        deliverable = f"{task} complete"
+        success = "Ready for next phase"
+        status = "Planned" if day > 1 else "Start today"
+        plan_lines.append(f"Day {day},{task},{deliverable},{success},{status}")
+
+    blocks = [
+        f"{title} - Copy/Paste Blocks",
+        "",
+        "Core positioning line:",
+        product.get("tagline", ""),
+        "",
+        "Primary implementation narrative:",
+        product.get("preview_snippet", ""),
+        "",
+        "Included deliverable checklist:",
+    ]
+    for item in included:
+        blocks.append(f"- {item}")
+    blocks.extend(
+        [
+            "",
+            "Customer-facing benefit statement:",
+            f"This {category.lower()} system is designed to save time and improve real outcomes within the first week of use.",
+        ]
+    )
 
     return [
         ("01_Start_Here.html", start_here_html),
@@ -1240,6 +1295,10 @@ th{background:#f7faff;color:#1e3a5f}
         ("03_Implementation_Workbook.csv", "\n".join(csv_lines)),
         ("04_Quickstart_Checklist.html", checklist_html),
         ("05_License_and_Guarantee.html", license_html),
+        ("06_Completed_Example.csv", "\n".join(sample_lines)),
+        (f"07_{asset_slug}_Master_Template.csv", "\n".join(master_lines)),
+        ("08_14_Day_Execution_Plan.csv", "\n".join(plan_lines)),
+        ("09_Copy_Paste_Blocks.txt", "\n".join(blocks)),
     ]
 
 
