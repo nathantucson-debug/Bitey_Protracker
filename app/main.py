@@ -51,6 +51,7 @@ SHOPIFY_CLIENT_ID = os.getenv("SHOPIFY_CLIENT_ID", "")
 SHOPIFY_CLIENT_SECRET = os.getenv("SHOPIFY_CLIENT_SECRET", "")
 SHOPIFY_REDIRECT_URI = os.getenv("SHOPIFY_REDIRECT_URI", "")
 SHOPIFY_SCOPES = os.getenv("SHOPIFY_SCOPES", "read_products,write_products")
+DOWNLOAD_LINK_SECRET = os.getenv("DOWNLOAD_LINK_SECRET", "")
 
 PAYPAL_BASE = "https://api-m.paypal.com" if PAYPAL_ENV == "live" else "https://api-m.sandbox.paypal.com"
 
@@ -832,6 +833,150 @@ def _wrap_cover_title(text: str, max_chars: int = 28, max_lines: int = 2) -> lis
     if not lines:
         lines = ["Premium Digital Product"]
     return lines[:max_lines]
+
+
+def download_secret() -> str:
+    return DOWNLOAD_LINK_SECRET or STRIPE_WEBHOOK_SECRET or ADMIN_TOKEN
+
+
+def create_download_token(payload: dict, ttl_seconds: int = 60 * 60 * 24 * 30) -> str:
+    exp_ts = int(datetime.now(timezone.utc).timestamp()) + max(300, ttl_seconds)
+    body = {**payload, "exp": exp_ts}
+    body_b64 = b64url(json.dumps(body, separators=(",", ":")).encode("utf-8"))
+    sig = hmac.new(download_secret().encode("utf-8"), body_b64.encode("utf-8"), hashlib.sha256).hexdigest()
+    return f"{body_b64}.{sig}"
+
+
+def parse_download_token(token: str) -> dict | None:
+    parts = (token or "").split(".", 1)
+    if len(parts) != 2:
+        return None
+    body_b64, provided_sig = parts
+    expected_sig = hmac.new(download_secret().encode("utf-8"), body_b64.encode("utf-8"), hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(expected_sig, provided_sig):
+        return None
+    try:
+        body = json.loads(b64url_decode(body_b64).decode("utf-8"))
+    except Exception:
+        return None
+    exp = int(body.get("exp") or 0)
+    now_ts = int(datetime.now(timezone.utc).timestamp())
+    if exp <= now_ts:
+        return None
+    return body
+
+
+def _customer_pack_files(product: dict) -> list[tuple[str, str]]:
+    preview = product.get("real_world_preview", {})
+    title = product.get("title", "Digital Product")
+    price = f"${product.get('price_cents', 0) / 100:.2f}"
+    included = product.get("preview_items", [])
+
+    start_here = [
+        f"{title}",
+        "",
+        "Thank you for purchasing from Northstar Studio.",
+        "",
+        "What is included:",
+    ]
+    for item in included:
+        start_here.append(f"- {item}")
+    start_here.extend(
+        [
+            "",
+            "How to use this pack in 15 minutes:",
+            "1) Open PRODUCT_GUIDE.txt.",
+            "2) Review TEMPLATE_WORKBOOK.csv.",
+            "3) Apply QUICKSTART_CHECKLIST.txt.",
+            "",
+            f"Category: {product.get('category', 'General')}",
+            f"Price paid: {price}",
+        ]
+    )
+
+    guide = [
+        f"PRODUCT GUIDE: {title}",
+        "",
+        f"Tagline: {product.get('tagline', '')}",
+        "",
+        product.get("description", ""),
+        "",
+        "Implementation walkthrough:",
+        product.get("preview_snippet", ""),
+        "",
+        "Sample deliverable:",
+        preview.get("headline", ""),
+        preview.get("subhead", ""),
+    ]
+
+    checklist = [
+        "QUICKSTART CHECKLIST",
+        "",
+        "[ ] Read PRODUCT_GUIDE.txt",
+        "[ ] Customize TEMPLATE_WORKBOOK.csv with your information",
+        "[ ] Complete the first execution pass",
+        "[ ] Review and optimize using your included checklist items",
+        "",
+        "Support policy:",
+        "7-day satisfaction guarantee with one store-credit request per payment.",
+    ]
+
+    license_text = [
+        "LICENSE & GUARANTEE",
+        "",
+        "License: Single buyer use unless otherwise stated in your purchase terms.",
+        "No reselling, sublicensing, or redistribution of this package.",
+        "",
+        "Guarantee:",
+        "7-day satisfaction guarantee with one store-credit request per payment.",
+        "Store credit equals the original purchase amount.",
+    ]
+
+    columns = preview.get("columns", []) or ["Section", "Details", "Outcome"]
+    rows = preview.get("rows", []) or [["Quickstart", "Implementation steps", "Fast activation"]]
+    csv_lines = [",".join(str(c).replace(",", ";") for c in columns)]
+    for row in rows:
+        csv_lines.append(",".join(str(c).replace(",", ";") for c in row))
+
+    return [
+        ("START_HERE.txt", "\n".join(start_here)),
+        ("PRODUCT_GUIDE.txt", "\n".join(guide)),
+        ("QUICKSTART_CHECKLIST.txt", "\n".join(checklist)),
+        ("TEMPLATE_WORKBOOK.csv", "\n".join(csv_lines)),
+        ("LICENSE_AND_GUARANTEE.txt", "\n".join(license_text)),
+    ]
+
+
+def build_customer_product_pack(product: dict) -> bytes:
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
+        for name, content in _customer_pack_files(product):
+            zf.writestr(name, content)
+    return buf.getvalue()
+
+
+def build_customer_bundle_pack(bundle: dict) -> bytes:
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr(
+            "START_HERE.txt",
+            "\n".join(
+                [
+                    f"{bundle['title']}",
+                    "",
+                    "Thank you for purchasing this Northstar Studio bundle.",
+                    "Each folder contains a complete product pack.",
+                ]
+            ),
+        )
+        for item in bundle.get("items", []):
+            product = get_product_by_title(item["title"])
+            if not product:
+                continue
+            folder = f"{slugify(product['title'])}/"
+            for name, content in _customer_pack_files(product):
+                zf.writestr(folder + name, content)
+    return buf.getvalue()
 
 
 def build_product_qc_zip(product: dict) -> bytes:
@@ -2095,14 +2240,21 @@ def handle_post_purchase_delivery(event: dict, sale_id: str) -> tuple[bool, str]
     lines = [
         "Thanks for your purchase from Northstar Studio.",
         "",
-        "Your access links:",
+        "Your download links:",
     ]
     if product_id:
         product = get_product(product_id)
         if product:
-            lines.append(f"- {product['title']}: {base_url}/products/{product_id}")
+            token = create_download_token({"kind": "product", "product_id": product_id, "email": email})
+            lines.append(
+                f"- {product['title']}: {base_url}/download/product/{product_id}?token={parse.quote(token)}"
+            )
     if bundle_key:
-        lines.append(f"- Bundle access page: {base_url}/bundle/{bundle_key}")
+        token = create_download_token({"kind": "bundle", "bundle_key": bundle_key, "email": email})
+        lines.append(
+            f"- {bundle_key.replace('-', ' ').title()} bundle package: "
+            f"{base_url}/download/bundle/{bundle_key}?token={parse.quote(token)}"
+        )
     if order_bump == "yes":
         lines.append(f"- {ORDER_BUMP['name']}: {base_url}/quickstart-video-companion")
     lines.extend(
@@ -2316,10 +2468,9 @@ def dynamic_cover() -> Response:
 <text x="84" y="178" fill="rgba(255,255,255,0.92)" font-size="38" font-family="Manrope, Arial, sans-serif">{safe_category}</text>
 {line_markup}
 <rect x="84" y="472" width="1032" height="2" fill="rgba(255,255,255,0.3)"/>
-<rect x="84" y="500" width="260" height="122" rx="14" fill="url(#glass)" stroke="rgba(255,255,255,0.25)" />
-<text x="106" y="542" fill="#ffffff" font-size="27" font-family="Sora, Arial, sans-serif" font-weight="700">Instant Download</text>
-<text x="106" y="575" fill="rgba(255,255,255,0.92)" font-size="23" font-family="Manrope, Arial, sans-serif">Editable files included</text>
-<text x="84" y="560" fill="rgba(255,255,255,0.92)" font-size="30" font-family="Manrope, Arial, sans-serif">Premium Digital Product</text>
+<rect x="84" y="516" width="316" height="94" rx="14" fill="url(#glass)" stroke="rgba(255,255,255,0.25)" />
+<text x="108" y="555" fill="#ffffff" font-size="29" font-family="Sora, Arial, sans-serif" font-weight="700">Instant Download</text>
+<text x="108" y="586" fill="rgba(255,255,255,0.92)" font-size="21" font-family="Manrope, Arial, sans-serif">Editable premium files</text>
 </svg>"""
     return Response(svg, mimetype="image/svg+xml")
 
@@ -2428,6 +2579,42 @@ def health():
 @app.get("/api/products")
 def api_products():
     return jsonify({"products": list_products()})
+
+
+@app.get("/download/product/<product_id>")
+def customer_download_product(product_id: str):
+    token = (flask_request.args.get("token") or "").strip()
+    payload = parse_download_token(token)
+    if not payload or payload.get("kind") != "product" or payload.get("product_id") != product_id:
+        return jsonify({"error": "invalid or expired download token"}), 403
+    product = get_product(product_id)
+    if not product:
+        return jsonify({"error": "product not found"}), 404
+    package = build_customer_product_pack(product)
+    filename = f"{slugify(product['title'])}-northstar-studio.zip"
+    return Response(
+        package,
+        mimetype="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@app.get("/download/bundle/<bundle_key>")
+def customer_download_bundle(bundle_key: str):
+    token = (flask_request.args.get("token") or "").strip()
+    payload = parse_download_token(token)
+    if not payload or payload.get("kind") != "bundle" or payload.get("bundle_key") != bundle_key:
+        return jsonify({"error": "invalid or expired download token"}), 403
+    bundle = get_bundle(bundle_key)
+    if not bundle:
+        return jsonify({"error": "bundle not found"}), 404
+    package = build_customer_bundle_pack(bundle)
+    filename = f"{slugify(bundle['title'])}-northstar-studio-bundle.zip"
+    return Response(
+        package,
+        mimetype="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @app.get("/admin/download/product/<product_id>.zip")

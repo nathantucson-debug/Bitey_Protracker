@@ -66,6 +66,8 @@ Notes:
 - `GET /store` storefront
 - `GET /health`
 - `GET /api/products`
+- `GET /download/product/<product_id>?token=<signed_token>` (customer delivery download)
+- `GET /download/bundle/<bundle_key>?token=<signed_token>` (customer bundle delivery download)
 - `GET /admin/download-links` (admin token required; returns QC ZIP links for all active products)
 - `GET /admin/download/product/<product_id>.zip` (admin token required; download product QC package)
 - `GET /products/<product_id>`
