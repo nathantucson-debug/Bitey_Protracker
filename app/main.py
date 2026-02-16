@@ -1088,6 +1088,44 @@ def _customer_pack_files(product: dict) -> list[tuple[str, str]]:
             ],
         },
     )
+    workflow_title = f"{title} Implementation Blueprint"
+    deliverable_focus = included[0] if included else f"{title} core deliverable"
+    title_rows: list[list[str]] = []
+    for idx, item in enumerate(included[:5], 1):
+        if len(cols := artifact["columns"]) >= 6:
+            title_rows.append(
+                [
+                    f"Phase {idx}",
+                    f"Build and customize {item}",
+                    "Buyer",
+                    f"Week {idx}",
+                    "Planned",
+                    f"Complete and review {item.lower()}",
+                ]
+            )
+        else:
+            title_rows.append(
+                [
+                    f"Phase {idx}",
+                    f"Build and customize {item}",
+                    "Buyer",
+                    f"Week {idx}",
+                    "Planned",
+                ]
+            )
+    if not title_rows:
+        if len(artifact["columns"]) >= 6:
+            title_rows = [
+                ["Phase 1", f"Customize {deliverable_focus}", "Buyer", "Week 1", "Planned", "First draft complete"],
+                ["Phase 2", "Run first implementation", "Buyer", "Week 2", "Planned", "Live test complete"],
+                ["Phase 3", "Optimize based on results", "Buyer", "Week 3", "Planned", "Improved version complete"],
+            ]
+        else:
+            title_rows = [
+                ["Phase 1", f"Customize {deliverable_focus}", "Buyer", "Week 1", "Planned"],
+                ["Phase 2", "Run first implementation", "Buyer", "Week 2", "Planned"],
+                ["Phase 3", "Optimize based on results", "Buyer", "Week 3", "Planned"],
+            ]
     safe_title = html.escape(title)
     safe_category = html.escape(product.get("category", "General"))
     safe_tagline = html.escape(product.get("tagline", ""))
@@ -1114,7 +1152,7 @@ th{background:#f7faff;color:#1e3a5f}
 
     included_html = "".join(f"<li>{html.escape(item)}</li>" for item in included)
     cols = artifact["columns"]
-    rows = artifact["rows"]
+    rows = title_rows
     header_html = "".join(f"<th>{html.escape(str(c))}</th>" for c in cols)
     row_html = "".join(
         "<tr>" + "".join(f"<td>{html.escape(str(cell))}</td>" for cell in row) + "</tr>"
@@ -1141,17 +1179,17 @@ th{background:#f7faff;color:#1e3a5f}
 <p>{safe_description}</p>
 <h3>How to implement</h3>
 <p>{safe_snippet}</p>
-<h3>{html.escape(preview.get("headline", "Sample Deliverable"))}</h3>
-<p>{html.escape(preview.get("subhead", ""))}</p>
+<h3>{html.escape(workflow_title)}</h3>
+<p>Use this exact execution sequence to take {safe_title} from setup to completed deliverable.</p>
 <table><thead><tr>{header_html}</tr></thead><tbody>{row_html}</tbody></table>
-<div class="cta">{html.escape(preview.get("result", "Outcome: immediate implementation support."))}</div>
+<div class="cta">{html.escape(preview.get("result", f"Outcome: {title} is fully implemented with measurable progress."))}</div>
 </section></div></body></html>"""
 
     checklist_items = [
-        "Review the full product guide and confirm your target outcome.",
-        "Customize the workbook with your details and timeline.",
-        "Complete your first implementation pass.",
-        "Review results and improve your next version.",
+        f"Define the success outcome for {title}.",
+        f"Customize {deliverable_focus} with your own details.",
+        "Complete the first full execution pass this week.",
+        "Review results and improve the next version.",
     ]
     checklist_items.extend(artifact["steps"])
     for item in included[:5]:
