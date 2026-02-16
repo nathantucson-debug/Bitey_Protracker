@@ -1296,6 +1296,113 @@ th{background:#f7faff;color:#1e3a5f}
         ]
     )
 
+    workspace_rows = "".join(
+        f"<tr><td>{html.escape(str(r[0]))}</td><td contenteditable='true'>{html.escape(str(r[1]))}</td>"
+        f"<td contenteditable='true'>{html.escape(str(r[2]))}</td><td contenteditable='true'>{html.escape(str(r[3]))}</td></tr>"
+        for r in customer_rows
+    )
+    included_list = "".join(f"<li>{html.escape(i)}</li>" for i in included)
+    workspace_html = f"""<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+body{{margin:0;background:#f3f7ff;color:#0f172a;font-family:Manrope,Segoe UI,sans-serif}}
+.wrap{{max-width:980px;margin:0 auto;padding:24px 16px}}
+.card{{background:#fff;border:1px solid #dbe3f0;border-radius:14px;padding:18px;box-shadow:0 10px 24px rgba(15,23,42,.08);margin-bottom:12px}}
+h1,h2{{font-family:Sora,Manrope,sans-serif;margin:0 0 10px}}
+p{{margin:0 0 10px;line-height:1.6;color:#334155}}
+table{{width:100%;border-collapse:collapse;background:#fff}}
+th,td{{border:1px solid #e3ebfa;padding:10px;text-align:left;vertical-align:top}}
+th{{background:#f7faff;color:#1f3c66}}
+td[contenteditable="true"]{{background:#fcfdff}}
+.row{{display:flex;gap:8px;flex-wrap:wrap}}
+button{{border:1px solid #dbe3f0;background:#fff;border-radius:10px;padding:10px 12px;font-weight:700;cursor:pointer}}
+button.primary{{background:#1e4ed8;border-color:#1e4ed8;color:#fff}}
+.meta{{display:inline-block;padding:5px 10px;border-radius:999px;background:#eef3ff;border:1px solid #d1deff;color:#1d4fb0;font-weight:700;font-size:13px}}
+</style></head><body>
+<div class="wrap">
+<section class="card">
+<span class="meta">{safe_category}</span>
+<h1>{safe_title} Workspace</h1>
+<p><strong>{safe_tagline}</strong></p>
+<p>{safe_description}</p>
+<h2>Included Deliverables</h2>
+<ul>{included_list}</ul>
+</section>
+<section class="card">
+<h2>Implementation Planner (Editable)</h2>
+<p>Click any cell to edit. Use the buttons below to save and export your progress.</p>
+<table id="planner">
+<thead><tr><th>Step</th><th>What To Do</th><th>When</th><th>Expected Result</th></tr></thead>
+<tbody>{workspace_rows}</tbody>
+</table>
+<div class="row" style="margin-top:12px">
+<button class="primary" onclick="savePlan()">Save Progress</button>
+<button onclick="loadPlan()">Load Saved</button>
+<button onclick="addRow()">Add Step</button>
+<button onclick="exportCsv()">Export CSV</button>
+</div>
+</section>
+<section class="card">
+<h2>Action Prompt</h2>
+<p>{safe_snippet}</p>
+</section>
+</div>
+<script>
+const KEY = "northstar_workspace_{slugify(title)}";
+function tableData() {{
+  const rows = [...document.querySelectorAll("#planner tbody tr")];
+  return rows.map(r => [...r.children].map(c => c.innerText.trim()));
+}}
+function renderRows(data) {{
+  const tbody = document.querySelector("#planner tbody");
+  tbody.innerHTML = "";
+  data.forEach((row, idx) => {{
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${{row[0] || `Step ${{idx+1}}`}}</td><td contenteditable="true">${{row[1] || ""}}</td><td contenteditable="true">${{row[2] || ""}}</td><td contenteditable="true">${{row[3] || ""}}</td>`;
+    tbody.appendChild(tr);
+  }});
+}}
+function savePlan() {{
+  localStorage.setItem(KEY, JSON.stringify(tableData()));
+  alert("Saved.");
+}}
+function loadPlan() {{
+  const raw = localStorage.getItem(KEY);
+  if (!raw) return alert("No saved plan found.");
+  renderRows(JSON.parse(raw));
+}}
+function addRow() {{
+  const data = tableData();
+  data.push([`Step ${{data.length + 1}}`, "", "", ""]);
+  renderRows(data);
+}}
+function exportCsv() {{
+  const rows = [["Step","What To Do","When","Expected Result"], ...tableData()];
+  const csv = rows.map(r => r.map(v => `"${{String(v).replaceAll('"','""')}}"`).join(",")).join("\\n");
+  const blob = new Blob([csv], {{type:"text/csv;charset=utf-8;"}});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "implementation-planner.csv";
+  a.click();
+  URL.revokeObjectURL(a.href);
+}}
+</script>
+</body></html>"""
+
+    example_items = "".join(
+        f"<li><strong>{html.escape(item)}</strong>: ready-to-customize section included.</li>"
+        for item in included
+    )
+    filled_example_html = f"""<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">{style}</head><body>
+<div class="wrap"><section class="card">
+<div class="meta">{safe_category}</div>
+<h1>{safe_title} Filled Example</h1>
+<p>This is a completed example showing one realistic way to use your purchased product.</p>
+<h3>Completed Structure</h3>
+<ul>{example_items}</ul>
+<h3>Implementation Outcome</h3>
+<p>{html.escape(preview.get("result", "Completed example demonstrates practical execution."))}</p>
+</section></div></body></html>"""
+
     return [
         ("01_Start_Here.html", start_here_html),
         ("02_Product_Guide.html", guide_html),
@@ -1306,6 +1413,8 @@ th{background:#f7faff;color:#1e3a5f}
         (f"07_{asset_slug}_Master_Template.csv", "\n".join(master_lines)),
         ("08_14_Day_Execution_Plan.csv", "\n".join(plan_lines)),
         ("09_Copy_Paste_Blocks.txt", "\n".join(blocks)),
+        ("10_Interactive_Workspace.html", workspace_html),
+        ("11_Filled_Example.html", filled_example_html),
     ]
 
 
