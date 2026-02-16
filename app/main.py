@@ -2,12 +2,14 @@ import base64
 import html
 import hashlib
 import hmac
+import io
 import json
 import os
 import sqlite3
 import smtplib
 import threading
 import uuid
+import zipfile
 from datetime import datetime, timezone
 from email.message import EmailMessage
 from urllib import parse, request
@@ -830,6 +832,85 @@ def _wrap_cover_title(text: str, max_chars: int = 28, max_lines: int = 2) -> lis
     if not lines:
         lines = ["Premium Digital Product"]
     return lines[:max_lines]
+
+
+def build_product_qc_zip(product: dict) -> bytes:
+    preview = product.get("real_world_preview", {})
+    title = product.get("title", "Untitled Product")
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
+        summary_lines = [
+            f"Product: {title}",
+            f"Category: {product.get('category', 'General')}",
+            f"Price: ${product.get('price_cents', 0) / 100:.2f}",
+            "",
+            "Tagline:",
+            product.get("tagline", ""),
+            "",
+            "Description:",
+            product.get("description", ""),
+            "",
+            "Included:",
+        ]
+        for item in product.get("preview_items", []):
+            summary_lines.append(f"- {item}")
+        summary_lines.extend(
+            [
+                "",
+                "How Buyers Use It:",
+                product.get("preview_snippet", ""),
+                "",
+                "Satisfaction policy:",
+                "7-day satisfaction guarantee with one store-credit request per payment.",
+            ]
+        )
+        zf.writestr("README.txt", "\n".join(summary_lines))
+        zf.writestr("product.json", json.dumps(product, indent=2))
+
+        artifact_lines = [
+            preview.get("headline", "Sample Deliverable"),
+            preview.get("subhead", ""),
+            "",
+            "Columns:",
+            ", ".join(preview.get("columns", [])),
+            "",
+            "Rows:",
+        ]
+        for row in preview.get("rows", []):
+            artifact_lines.append(" | ".join(str(c) for c in row))
+        artifact_lines.extend(["", "Outcome:", preview.get("result", "")])
+        zf.writestr("sample_artifact.txt", "\n".join(artifact_lines))
+
+        csv_rows = [preview.get("columns", [])] + preview.get("rows", [])
+        csv_text = "\n".join(",".join(str(c).replace(",", ";") for c in row) for row in csv_rows if row)
+        zf.writestr("sample_artifact.csv", csv_text)
+
+        sales_page = [
+            f"# {title}",
+            "",
+            f"**Category:** {product.get('category', 'General')}",
+            f"**Price:** ${product.get('price_cents', 0) / 100:.2f}",
+            "",
+            f"## {product.get('tagline', '')}",
+            "",
+            product.get("description", ""),
+            "",
+            "## Included",
+        ]
+        for item in product.get("preview_items", []):
+            sales_page.append(f"- {item}")
+        sales_page.extend(
+            [
+                "",
+                "## Real-World Buyer Outcome",
+                preview.get("result", ""),
+                "",
+                "## Guarantee",
+                "7-day satisfaction guarantee. One store-credit request per payment.",
+            ]
+        )
+        zf.writestr("sales_page.md", "\n".join(sales_page))
+    return buf.getvalue()
 
 
 def real_world_preview(title: str) -> dict:
@@ -2207,11 +2288,11 @@ def dynamic_cover() -> Response:
     safe_category = html.escape(category[:40])
     safe_lines = [html.escape(line[:40]) for line in lines]
 
-    line_y_start = 250
-    line_gap = 84
+    line_y_start = 278
+    line_gap = 78
     line_markup = "".join(
         f'<text x="84" y="{line_y_start + idx * line_gap}" fill="#ffffff" '
-        f'font-size="64" font-family="Sora, Arial, sans-serif" font-weight="800">{line}</text>'
+        f'font-size="58" font-family="Sora, Arial, sans-serif" font-weight="800">{line}</text>'
         for idx, line in enumerate(safe_lines)
     )
 
@@ -2221,13 +2302,23 @@ def dynamic_cover() -> Response:
     <stop offset="0%" stop-color="{html.escape(start)}"/>
     <stop offset="100%" stop-color="{html.escape(end)}"/>
   </linearGradient>
+  <linearGradient id="glass" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0%" stop-color="rgba(255,255,255,0.28)"/>
+    <stop offset="100%" stop-color="rgba(255,255,255,0.08)"/>
+  </linearGradient>
 </defs>
 <rect width="1200" height="675" rx="28" fill="url(#g)"/>
+<rect x="54" y="54" width="1092" height="567" rx="24" fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="2"/>
+<circle cx="1044" cy="114" r="78" fill="rgba(255,255,255,0.09)"/>
+<circle cx="1005" cy="540" r="122" fill="rgba(255,255,255,0.07)"/>
 <rect x="84" y="72" width="290" height="56" rx="28" fill="rgba(255,255,255,0.18)"/>
 <text x="116" y="109" fill="#ffffff" font-size="34" font-family="Sora, Arial, sans-serif" font-weight="700">Northstar Studio</text>
 <text x="84" y="178" fill="rgba(255,255,255,0.92)" font-size="38" font-family="Manrope, Arial, sans-serif">{safe_category}</text>
 {line_markup}
-<rect x="84" y="484" width="1032" height="2" fill="rgba(255,255,255,0.3)"/>
+<rect x="84" y="472" width="1032" height="2" fill="rgba(255,255,255,0.3)"/>
+<rect x="84" y="500" width="260" height="122" rx="14" fill="url(#glass)" stroke="rgba(255,255,255,0.25)" />
+<text x="106" y="542" fill="#ffffff" font-size="27" font-family="Sora, Arial, sans-serif" font-weight="700">Instant Download</text>
+<text x="106" y="575" fill="rgba(255,255,255,0.92)" font-size="23" font-family="Manrope, Arial, sans-serif">Editable files included</text>
 <text x="84" y="560" fill="rgba(255,255,255,0.92)" font-size="30" font-family="Manrope, Arial, sans-serif">Premium Digital Product</text>
 </svg>"""
     return Response(svg, mimetype="image/svg+xml")
@@ -2337,6 +2428,42 @@ def health():
 @app.get("/api/products")
 def api_products():
     return jsonify({"products": list_products()})
+
+
+@app.get("/admin/download/product/<product_id>.zip")
+def admin_download_product_zip(product_id: str):
+    if not admin_guard_any():
+        return jsonify({"error": "unauthorized"}), 401
+    product = get_product(product_id)
+    if not product:
+        return jsonify({"error": "product not found"}), 404
+    payload = build_product_qc_zip(product)
+    filename = f"{slugify(product.get('title', 'product'))}-qc-pack.zip"
+    return Response(
+        payload,
+        mimetype="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@app.get("/admin/download-links")
+def admin_download_links():
+    if not admin_guard_any():
+        return jsonify({"error": "unauthorized"}), 401
+    token = admin_token_value()
+    base = public_base_url()
+    links = []
+    for p in list_products():
+        links.append(
+            {
+                "id": p["id"],
+                "title": p["title"],
+                "qc_download": f"{base}/admin/download/product/{p['id']}.zip?admin_token={parse.quote(token)}",
+                "preview": f"{base}/products/{p['id']}",
+                "checkout": f"{base}/checkout/{p['id']}",
+            }
+        )
+    return jsonify({"count": len(links), "products": links})
 
 
 @app.get("/checkout/<product_id>")

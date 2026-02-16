@@ -182,6 +182,8 @@
                 <a href="/products/{{ p.id }}" target="_blank" rel="noopener">View</a>
                 |
                 <a href="{{ p.checkout_url }}" target="_blank" rel="noopener">Buy</a>
+                |
+                <a href="/admin/download/product/{{ p.id }}.zip?admin_token={{ admin_token_hint|urlencode }}" target="_blank" rel="noopener">QC ZIP</a>
               </td>
               <td>
                 <form action="/admin/publish/etsy/{{ p.id }}" method="POST">
@@ -209,6 +211,9 @@
             {% endfor %}
           </tbody>
         </table>
+        <div class="actions">
+          <a class="btn" href="/admin/download-links?admin_token={{ admin_token_hint|urlencode }}" target="_blank" rel="noopener">All QC Download Links (JSON)</a>
+        </div>
       </section>
 
       <section class="card">
