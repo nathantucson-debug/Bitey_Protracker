@@ -871,6 +871,223 @@ def _customer_pack_files(product: dict) -> list[tuple[str, str]]:
     title = product.get("title", "Digital Product")
     price = f"${product.get('price_cents', 0) / 100:.2f}"
     included = product.get("preview_items", [])
+    category = product.get("category", "General")
+
+    category_artifacts = {
+        "Family": {
+            "columns": ["Week", "Focus", "Task", "Owner", "Status", "Notes"],
+            "rows": [
+                ["Week 1", "Daily routine", "Set morning schedule", "Parent", "Planned", ""],
+                ["Week 1", "Tracking", "Print tracker sheets", "Parent", "Planned", ""],
+                ["Week 2", "Consistency", "Run 5-day routine", "Family", "Planned", ""],
+            ],
+            "steps": [
+                "Define your weekly family objective.",
+                "Customize all schedule blocks with real times.",
+                "Print or duplicate one clean weekly tracker.",
+                "Run the plan for 5 days before editing.",
+                "Review what worked and adjust one variable at a time.",
+            ],
+        },
+        "Wellness": {
+            "columns": ["Day", "Habit/Workout", "Target", "Actual", "Status", "Adjustment"],
+            "rows": [
+                ["Mon", "Workout Session", "45 min", "", "Planned", ""],
+                ["Tue", "Hydration", "2.5L", "", "Planned", ""],
+                ["Wed", "Meal Prep", "3 meals", "", "Planned", ""],
+            ],
+            "steps": [
+                "Set one measurable weekly fitness/wellness target.",
+                "Customize daily targets for your schedule.",
+                "Track completion daily for 7 days.",
+                "Identify one bottleneck and simplify the plan.",
+                "Repeat with one progressive improvement.",
+            ],
+        },
+        "Finance": {
+            "columns": ["Category", "Budget", "Actual", "Variance", "Action", "Owner"],
+            "rows": [
+                ["Income", "6500", "", "", "Confirm expected inflows", "You"],
+                ["Housing", "1800", "", "", "Track weekly", "You"],
+                ["Food", "700", "", "", "Cap discretionary spend", "You"],
+                ["Savings", "900", "", "", "Auto-transfer", "You"],
+            ],
+            "steps": [
+                "Enter your true monthly baseline numbers.",
+                "Set budget caps for high-variance categories.",
+                "Track actuals weekly instead of month-end only.",
+                "Flag any variance above 10 percent.",
+                "Apply one corrective action immediately.",
+            ],
+        },
+        "Creator Growth": {
+            "columns": ["Content Asset", "Hook", "Core Value", "CTA", "Publish Date", "Status"],
+            "rows": [
+                ["Reel #1", "", "", "", "", "Planned"],
+                ["Reel #2", "", "", "", "", "Planned"],
+                ["Carousel #1", "", "", "", "", "Planned"],
+            ],
+            "steps": [
+                "Choose one audience pain point for this week.",
+                "Draft 3 hooks before writing body content.",
+                "Assign one CTA objective per post.",
+                "Schedule publishing dates and review cadence.",
+                "Measure retention and save rate after posting.",
+            ],
+        },
+        "Creator Business": {
+            "columns": ["Offer", "Audience", "Promise", "Price", "Launch Date", "Status"],
+            "rows": [
+                ["Core offer", "", "", "", "", "Draft"],
+                ["Upsell", "", "", "", "", "Draft"],
+                ["Email promo", "", "", "", "", "Draft"],
+            ],
+            "steps": [
+                "Define your core offer outcome in one sentence.",
+                "Set launch timeline and content milestones.",
+                "Draft customer-facing offer page language.",
+                "Map objection handling into email sequence.",
+                "Run launch review and optimize after week one.",
+            ],
+        },
+        "Ecommerce": {
+            "columns": ["Listing/Page", "Primary Keyword", "Benefit", "Proof", "CTA", "Status"],
+            "rows": [
+                ["Product 1", "", "", "", "", "Draft"],
+                ["Product 2", "", "", "", "", "Draft"],
+                ["Collection page", "", "", "", "", "Draft"],
+            ],
+            "steps": [
+                "Prioritize buyer intent keywords first.",
+                "Write benefit-led product sections.",
+                "Add trust proof and FAQ objections.",
+                "Finalize CTA and mobile readability check.",
+                "Publish and review conversion metrics weekly.",
+            ],
+        },
+        "Career": {
+            "columns": ["Target Role", "Evidence", "Resume Update", "Outreach", "Due Date", "Status"],
+            "rows": [
+                ["Role 1", "", "", "", "", "Planned"],
+                ["Role 2", "", "", "", "", "Planned"],
+                ["Role 3", "", "", "", "", "Planned"],
+            ],
+            "steps": [
+                "Select top 3 role targets.",
+                "Map measurable results for each role.",
+                "Tailor resume bullets to role outcomes.",
+                "Send strategic outreach with clear ask.",
+                "Track response rate and iterate weekly.",
+            ],
+        },
+        "Freelance Ops": {
+            "columns": ["Client", "Deliverable", "Deadline", "Owner", "Status", "Notes"],
+            "rows": [
+                ["Client A", "", "", "You", "Planned", ""],
+                ["Client B", "", "", "You", "Planned", ""],
+                ["Client C", "", "", "You", "Planned", ""],
+            ],
+            "steps": [
+                "Define scope and outcomes per client.",
+                "Set milestones and due dates up front.",
+                "Confirm approval/revision flow in writing.",
+                "Track delivery status weekly.",
+                "Run monthly client reporting and renewal prep.",
+            ],
+        },
+        "Operations": {
+            "columns": ["Process", "Owner", "Step", "SLA", "QA Check", "Status"],
+            "rows": [
+                ["Onboarding", "Ops", "Kickoff setup", "24h", "Checklist complete", "Draft"],
+                ["Delivery", "Ops", "Asset handoff", "48h", "QA pass", "Draft"],
+                ["Support", "Ops", "Issue resolution", "24h", "Customer confirmed", "Draft"],
+            ],
+            "steps": [
+                "Document process start/end conditions.",
+                "Assign clear owner per process stage.",
+                "Attach quality control checkpoints.",
+                "Set service-level time targets.",
+                "Review process performance monthly.",
+            ],
+        },
+        "Branding": {
+            "columns": ["Asset", "Guideline", "Primary Use", "Secondary Use", "Owner", "Status"],
+            "rows": [
+                ["Primary logo", "", "", "", "Brand Lead", "Draft"],
+                ["Color palette", "", "", "", "Brand Lead", "Draft"],
+                ["Typography", "", "", "", "Brand Lead", "Draft"],
+            ],
+            "steps": [
+                "Define brand positioning in one sentence.",
+                "Set visual standards for consistency.",
+                "Apply standards to 3 core channels.",
+                "Audit brand consistency monthly.",
+                "Refine messaging based on audience response.",
+            ],
+        },
+        "Real Estate": {
+            "columns": ["Lead/Listing", "Stage", "Action", "Date", "Owner", "Status"],
+            "rows": [
+                ["Lead 1", "New", "Initial contact", "", "Agent", "Planned"],
+                ["Lead 2", "Qualified", "Schedule consult", "", "Agent", "Planned"],
+                ["Lead 3", "Nurture", "Follow-up email", "", "Agent", "Planned"],
+            ],
+            "steps": [
+                "Capture lead details in one system.",
+                "Prioritize leads by readiness stage.",
+                "Run 48-hour follow-up consistently.",
+                "Track conversion by channel source.",
+                "Refine outreach based on response rate.",
+            ],
+        },
+        "Events": {
+            "columns": ["Milestone", "Task", "Owner", "Deadline", "Status", "Notes"],
+            "rows": [
+                ["Planning", "Finalize run-of-show", "Coordinator", "", "Planned", ""],
+                ["Vendors", "Confirm logistics", "Coordinator", "", "Planned", ""],
+                ["Execution", "Day-of checklist", "Team", "", "Planned", ""],
+            ],
+            "steps": [
+                "Define event objective and success criteria.",
+                "Lock timeline and owner per milestone.",
+                "Confirm all vendor dependencies.",
+                "Run final pre-event QA walkthrough.",
+                "Capture post-event lessons learned.",
+            ],
+        },
+        "Hospitality": {
+            "columns": ["Guest Stage", "Message/Task", "Owner", "SLA", "Status", "Notes"],
+            "rows": [
+                ["Pre-arrival", "Welcome message", "Host", "Same day", "Planned", ""],
+                ["Stay", "Issue response flow", "Host", "2h", "Planned", ""],
+                ["Checkout", "Review request", "Host", "24h", "Planned", ""],
+            ],
+            "steps": [
+                "Set guest communication standards.",
+                "Define response times by issue type.",
+                "Create repeatable turnover checklist.",
+                "Review guest feedback weekly.",
+                "Optimize operations for repeatability.",
+            ],
+        },
+    }
+    artifact = category_artifacts.get(
+        category,
+        {
+            "columns": ["Priority", "Action Item", "Owner", "Due Date", "Status", "Notes"],
+            "rows": [
+                ["High", "Define outcome", "You", "This week", "Planned", ""],
+                ["High", "Customize template", "You", "This week", "Planned", ""],
+                ["Medium", "Execute first version", "You", "Next week", "Planned", ""],
+            ],
+            "steps": [
+                "Define your desired outcome.",
+                "Customize the template files.",
+                "Run your first implementation pass.",
+                "Measure and optimize.",
+            ],
+        },
+    )
     safe_title = html.escape(title)
     safe_category = html.escape(product.get("category", "General"))
     safe_tagline = html.escape(product.get("tagline", ""))
@@ -896,8 +1113,8 @@ th{background:#f7faff;color:#1e3a5f}
 """
 
     included_html = "".join(f"<li>{html.escape(item)}</li>" for item in included)
-    cols = preview.get("columns", []) or ["Module", "What It Includes", "Buyer Outcome"]
-    rows = preview.get("rows", []) or [["Quickstart", "Implementation steps", "Fast activation"]]
+    cols = artifact["columns"]
+    rows = artifact["rows"]
     header_html = "".join(f"<th>{html.escape(str(c))}</th>" for c in cols)
     row_html = "".join(
         "<tr>" + "".join(f"<td>{html.escape(str(cell))}</td>" for cell in row) + "</tr>"
@@ -930,16 +1147,25 @@ th{background:#f7faff;color:#1e3a5f}
 <div class="cta">{html.escape(preview.get("result", "Outcome: immediate implementation support."))}</div>
 </section></div></body></html>"""
 
+    checklist_items = [
+        "Review the full product guide and confirm your target outcome.",
+        "Customize the workbook with your details and timeline.",
+        "Complete your first implementation pass.",
+        "Review results and improve your next version.",
+    ]
+    checklist_items.extend(artifact["steps"])
+    for item in included[:5]:
+        checklist_items.append(f"Set up and complete: {item}.")
+    checklist_rows = "".join(
+        f'<label style="display:flex;align-items:flex-start;gap:10px;margin:8px 0;"><input type="checkbox" style="margin-top:4px;transform:scale(1.2)"><span>{html.escape(step)}</span></label>'
+        for step in checklist_items
+    )
+
     checklist_html = """<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">""" + style + """</head><body>
 <div class="wrap"><section class="card">
 <h1>Quickstart Checklist</h1>
-<ul>
-<li>[ ] Open <strong>02_Product_Guide.html</strong> and review the workflow.</li>
-<li>[ ] Fill out <strong>03_Implementation_Workbook.csv</strong> with your details.</li>
-<li>[ ] Complete your first implementation pass.</li>
-<li>[ ] Review outcomes and optimize with the included framework.</li>
-</ul>
-<div class="cta">Most buyers finish first setup in under 30 minutes.</div>
+""" + checklist_rows + """
+<div class="cta">Tip: complete one high-impact section first, then iterate weekly.</div>
 </section></div></body></html>"""
 
     license_html = """<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">""" + style + """</head><body>
@@ -952,9 +1178,23 @@ th{background:#f7faff;color:#1e3a5f}
 <p>Contact support by replying to your purchase email within 7 days.</p>
 </section></div></body></html>"""
 
-    csv_lines = [",".join(str(c).replace(",", ";") for c in cols)]
+    csv_headers = ["Milestone", "Action Item", "Owner", "Target Date", "Status", "Notes"]
+    csv_lines = [",".join(csv_headers)]
+    if included:
+        for idx, item in enumerate(included, 1):
+            csv_lines.append(f"Phase {idx},{item},You,YYYY-MM-DD,Planned,")
     for row in rows:
-        csv_lines.append(",".join(str(c).replace(",", ";") for c in row))
+        milestone = str(row[0]) if len(row) > 0 else "Phase"
+        action = str(row[1]) if len(row) > 1 else "Implementation step"
+        owner = str(row[2]) if len(row) > 2 else "You"
+        due = str(row[3]) if len(row) > 3 else "YYYY-MM-DD"
+        metric = str(row[4]) if len(row) > 4 else ""
+        csv_lines.append(
+            ",".join(
+                x.replace(",", ";")
+                for x in [milestone, action, owner, due, "In Progress", metric]
+            )
+        )
 
     return [
         ("01_Start_Here.html", start_here_html),
@@ -1269,15 +1509,17 @@ def real_world_preview(title: str) -> dict:
     return previews.get(
         title,
         {
-            "headline": "Sample Deliverable Preview",
-            "subhead": "A practical look at what buyers receive after checkout.",
-            "columns": ["Module", "What It Includes", "Buyer Outcome"],
+            "headline": "Implementation Planner",
+            "subhead": "A practical worksheet buyers use to launch this product quickly.",
+            "columns": ["Priority", "Action Item", "Owner", "Due Date", "Success Metric"],
             "rows": [
-                ["Quickstart", "Getting started workflow", "Fast activation"],
-                ["Core Asset", "Editable template files", "Immediate implementation"],
-                ["Optimization", "Checklist + refinements", "Better performance"],
+                ["High", "Define your first deliverable outcome", "You", "This week", "Clear outcome selected"],
+                ["High", "Customize template with your business details", "You", "This week", "Draft completed"],
+                ["Medium", "Run first implementation pass", "You", "Next 7 days", "First version shipped"],
+                ["Medium", "Collect feedback and refine", "You", "Next 14 days", "Improved final version"],
+                ["Low", "Archive reusable version for future use", "You", "This month", "Reusable system saved"],
             ],
-            "result": "Outcome: day-one usability with premium documentation and support assets.",
+            "result": "Outcome: a clean first implementation and repeatable workflow in under 30 minutes.",
         },
     )
 
