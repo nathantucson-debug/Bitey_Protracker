@@ -1151,12 +1151,20 @@ th{background:#f7faff;color:#1e3a5f}
 """
 
     included_html = "".join(f"<li>{html.escape(item)}</li>" for item in included)
-    cols = artifact["columns"]
     rows = title_rows
-    header_html = "".join(f"<th>{html.escape(str(c))}</th>" for c in cols)
+    customer_columns = ["Step", "What To Do", "When", "Expected Result"]
+    customer_rows: list[list[str]] = []
+    for idx, row in enumerate(rows, 1):
+        action = str(row[1]) if len(row) > 1 else "Complete the next implementation task"
+        when = str(row[3]) if len(row) > 3 else f"Day {idx * 2}"
+        result = str(row[5]) if len(row) > 5 else (str(row[4]) if len(row) > 4 else "Task completed")
+        if not when or when == "YYYY-MM-DD":
+            when = f"Day {idx * 2}"
+        customer_rows.append([f"Step {idx}", action, when, result])
+    header_html = "".join(f"<th>{html.escape(str(c))}</th>" for c in customer_columns)
     row_html = "".join(
         "<tr>" + "".join(f"<td>{html.escape(str(cell))}</td>" for cell in row) + "</tr>"
-        for row in rows
+        for row in customer_rows
     )
 
     start_here_html = f"""<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">{style}</head><body>
@@ -1216,24 +1224,23 @@ th{background:#f7faff;color:#1e3a5f}
 <p>Contact support by replying to your purchase email within 7 days.</p>
 </section></div></body></html>"""
 
-    csv_headers = ["Milestone", "Action Item", "Owner", "Target Date", "Status", "Notes"]
+    csv_headers = ["Step", "Action Item", "Target Date", "Complete", "Your Notes"]
     csv_lines = [",".join(csv_headers)]
-    for idx, row in enumerate(rows, 1):
-        milestone = str(row[0]) if len(row) > 0 else f"Phase {idx}"
+    for idx, row in enumerate(customer_rows, 1):
+        milestone = str(row[0]) if len(row) > 0 else f"Step {idx}"
         action = str(row[1]) if len(row) > 1 else "Implementation step"
-        owner = str(row[2]) if len(row) > 2 else "Buyer"
-        due = str(row[3]) if len(row) > 3 else f"Day {idx * 2}"
+        due = str(row[2]) if len(row) > 2 else f"Day {idx * 2}"
         if not due or due == "YYYY-MM-DD":
             due = f"Day {idx * 2}"
-        note = str(row[5]) if len(row) > 5 else (str(row[4]) if len(row) > 4 else "")
+        note = str(row[3]) if len(row) > 3 else ""
         csv_lines.append(
             ",".join(
                 x.replace(",", ";")
-                for x in [milestone, action, owner, due, "Not Started", note]
+                for x in [milestone, action, due, "No", note]
             )
         )
 
-    sample_headers = [str(c) for c in (preview.get("columns") or ["Step", "Example", "Outcome"])]
+    sample_headers = ["Step", "Example", "Expected Result"]
     sample_rows = preview.get("rows") or [
         ["Step 1", "Set up your first template instance", "Ready to use"],
         ["Step 2", "Customize with your details", "Draft completed"],
