@@ -871,79 +871,97 @@ def _customer_pack_files(product: dict) -> list[tuple[str, str]]:
     title = product.get("title", "Digital Product")
     price = f"${product.get('price_cents', 0) / 100:.2f}"
     included = product.get("preview_items", [])
+    safe_title = html.escape(title)
+    safe_category = html.escape(product.get("category", "General"))
+    safe_tagline = html.escape(product.get("tagline", ""))
+    safe_description = html.escape(product.get("description", ""))
+    safe_snippet = html.escape(product.get("preview_snippet", ""))
 
-    start_here = [
-        f"{title}",
-        "",
-        "Thank you for purchasing from Northstar Studio.",
-        "",
-        "What is included:",
-    ]
-    for item in included:
-        start_here.append(f"- {item}")
-    start_here.extend(
-        [
-            "",
-            "How to use this pack in 15 minutes:",
-            "1) Open PRODUCT_GUIDE.txt.",
-            "2) Review TEMPLATE_WORKBOOK.csv.",
-            "3) Apply QUICKSTART_CHECKLIST.txt.",
-            "",
-            f"Category: {product.get('category', 'General')}",
-            f"Price paid: {price}",
-        ]
+    style = """
+<style>
+body{margin:0;background:#f4f7ff;color:#0f172a;font-family:Manrope,Segoe UI,sans-serif}
+.wrap{max-width:880px;margin:0 auto;padding:28px 18px}
+.card{background:#fff;border:1px solid #dbe3f0;border-radius:16px;padding:22px;box-shadow:0 10px 28px rgba(15,23,42,.08)}
+h1,h2,h3{font-family:Sora,Manrope,sans-serif;letter-spacing:-.02em;margin:0 0 10px}
+p{line-height:1.6;margin:0 0 10px;color:#334155}
+.meta{display:inline-block;padding:6px 12px;border-radius:999px;background:#edf3ff;border:1px solid #d0defe;color:#1d4fb0;font-weight:700;font-size:13px;margin-bottom:10px}
+ul{margin:0;padding-left:18px}
+li{margin:6px 0;line-height:1.5}
+table{width:100%;border-collapse:collapse;font-size:14px;background:#fff}
+th,td{padding:10px;border:1px solid #e4ecfb;text-align:left}
+th{background:#f7faff;color:#1e3a5f}
+.kicker{font-size:13px;font-weight:800;color:#31568a;text-transform:uppercase;letter-spacing:.05em}
+.cta{margin-top:14px;padding:14px;border:1px solid #d4e3ff;background:#f2f7ff;border-radius:12px;color:#1e3a8a;font-weight:700}
+</style>
+"""
+
+    included_html = "".join(f"<li>{html.escape(item)}</li>" for item in included)
+    cols = preview.get("columns", []) or ["Module", "What It Includes", "Buyer Outcome"]
+    rows = preview.get("rows", []) or [["Quickstart", "Implementation steps", "Fast activation"]]
+    header_html = "".join(f"<th>{html.escape(str(c))}</th>" for c in cols)
+    row_html = "".join(
+        "<tr>" + "".join(f"<td>{html.escape(str(cell))}</td>" for cell in row) + "</tr>"
+        for row in rows
     )
 
-    guide = [
-        f"PRODUCT GUIDE: {title}",
-        "",
-        f"Tagline: {product.get('tagline', '')}",
-        "",
-        product.get("description", ""),
-        "",
-        "Implementation walkthrough:",
-        product.get("preview_snippet", ""),
-        "",
-        "Sample deliverable:",
-        preview.get("headline", ""),
-        preview.get("subhead", ""),
-    ]
+    start_here_html = f"""<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">{style}</head><body>
+<div class="wrap"><section class="card">
+<div class="meta">{safe_category}</div>
+<h1>{safe_title}</h1>
+<p class="kicker">Welcome to your premium digital product</p>
+<p>Thank you for your purchase from Northstar Studio. This package is ready to use immediately.</p>
+<h3>What you received</h3>
+<ul>{included_html}</ul>
+<div class="cta">Open <strong>02_Product_Guide.html</strong> first, then complete <strong>03_Implementation_Workbook.csv</strong>.</div>
+<p><strong>Price:</strong> {price}</p>
+</section></div></body></html>"""
 
-    checklist = [
-        "QUICKSTART CHECKLIST",
-        "",
-        "[ ] Read PRODUCT_GUIDE.txt",
-        "[ ] Customize TEMPLATE_WORKBOOK.csv with your information",
-        "[ ] Complete the first execution pass",
-        "[ ] Review and optimize using your included checklist items",
-        "",
-        "Support policy:",
-        "7-day satisfaction guarantee with one store-credit request per payment.",
-    ]
+    guide_html = f"""<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">{style}</head><body>
+<div class="wrap"><section class="card">
+<div class="meta">{safe_category}</div>
+<h1>{safe_title} Guide</h1>
+<p><strong>{safe_tagline}</strong></p>
+<p>{safe_description}</p>
+<h3>How to implement</h3>
+<p>{safe_snippet}</p>
+<h3>{html.escape(preview.get("headline", "Sample Deliverable"))}</h3>
+<p>{html.escape(preview.get("subhead", ""))}</p>
+<table><thead><tr>{header_html}</tr></thead><tbody>{row_html}</tbody></table>
+<div class="cta">{html.escape(preview.get("result", "Outcome: immediate implementation support."))}</div>
+</section></div></body></html>"""
 
-    license_text = [
-        "LICENSE & GUARANTEE",
-        "",
-        "License: Single buyer use unless otherwise stated in your purchase terms.",
-        "No reselling, sublicensing, or redistribution of this package.",
-        "",
-        "Guarantee:",
-        "7-day satisfaction guarantee with one store-credit request per payment.",
-        "Store credit equals the original purchase amount.",
-    ]
+    checklist_html = """<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">""" + style + """</head><body>
+<div class="wrap"><section class="card">
+<h1>Quickstart Checklist</h1>
+<ul>
+<li>[ ] Open <strong>02_Product_Guide.html</strong> and review the workflow.</li>
+<li>[ ] Fill out <strong>03_Implementation_Workbook.csv</strong> with your details.</li>
+<li>[ ] Complete your first implementation pass.</li>
+<li>[ ] Review outcomes and optimize with the included framework.</li>
+</ul>
+<div class="cta">Most buyers finish first setup in under 30 minutes.</div>
+</section></div></body></html>"""
 
-    columns = preview.get("columns", []) or ["Section", "Details", "Outcome"]
-    rows = preview.get("rows", []) or [["Quickstart", "Implementation steps", "Fast activation"]]
-    csv_lines = [",".join(str(c).replace(",", ";") for c in columns)]
+    license_html = """<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">""" + style + """</head><body>
+<div class="wrap"><section class="card">
+<h1>License & Guarantee</h1>
+<h3>License</h3>
+<p>Single buyer use unless otherwise stated in writing. Redistribution, resale, or sublicensing is not allowed.</p>
+<h3>7-day satisfaction guarantee</h3>
+<p>One store-credit request per payment. Credit equals the original purchase amount and can be applied to another product.</p>
+<p>Contact support by replying to your purchase email within 7 days.</p>
+</section></div></body></html>"""
+
+    csv_lines = [",".join(str(c).replace(",", ";") for c in cols)]
     for row in rows:
         csv_lines.append(",".join(str(c).replace(",", ";") for c in row))
 
     return [
-        ("START_HERE.txt", "\n".join(start_here)),
-        ("PRODUCT_GUIDE.txt", "\n".join(guide)),
-        ("QUICKSTART_CHECKLIST.txt", "\n".join(checklist)),
-        ("TEMPLATE_WORKBOOK.csv", "\n".join(csv_lines)),
-        ("LICENSE_AND_GUARANTEE.txt", "\n".join(license_text)),
+        ("01_Start_Here.html", start_here_html),
+        ("02_Product_Guide.html", guide_html),
+        ("03_Implementation_Workbook.csv", "\n".join(csv_lines)),
+        ("04_Quickstart_Checklist.html", checklist_html),
+        ("05_License_and_Guarantee.html", license_html),
     ]
 
 
@@ -959,15 +977,13 @@ def build_customer_bundle_pack(bundle: dict) -> bytes:
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
         zf.writestr(
-            "START_HERE.txt",
-            "\n".join(
-                [
-                    f"{bundle['title']}",
-                    "",
-                    "Thank you for purchasing this Northstar Studio bundle.",
-                    "Each folder contains a complete product pack.",
-                ]
-            ),
+            "00_Bundle_Start_Here.html",
+            f"""<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>body{{font-family:Manrope,Segoe UI,sans-serif;background:#f4f7ff;color:#0f172a}}.wrap{{max-width:820px;margin:30px auto;padding:0 18px}}
+.card{{background:#fff;border:1px solid #dbe3f0;border-radius:16px;padding:22px}}h1{{font-family:Sora,Manrope,sans-serif}}</style></head>
+<body><div class="wrap"><section class="card"><h1>{html.escape(bundle['title'])}</h1>
+<p>Thank you for purchasing this Northstar Studio bundle.</p>
+<p>Open each product folder and start with <strong>01_Start_Here.html</strong>.</p></section></div></body></html>""",
         )
         for item in bundle.get("items", []):
             product = get_product_by_title(item["title"])
