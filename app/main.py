@@ -2587,6 +2587,19 @@ def dashboard():
     )
 
 
+@app.get("/admin/qc")
+def admin_qc_page():
+    if not admin_guard_any():
+        return jsonify({"error": "unauthorized"}), 401
+    products = list_products()
+    token = admin_token_value()
+    return render_template(
+        "qc.html",
+        products=products,
+        admin_token_hint=token,
+    )
+
+
 @app.get("/health")
 def health():
     return jsonify({"ok": True, "time": utc_now_iso(), "active_products": count_active_products()})

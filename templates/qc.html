@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Northstar Studio QC</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Sora:wght@700;800&display=swap');
+    :root { --bg:#f5f8ff; --ink:#0f172a; --muted:#4b5563; --line:#dbe3f0; --brand:#1e4ed8; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:"Manrope","Segoe UI",sans-serif; color:var(--ink); background:
+      radial-gradient(1200px 500px at -10% -15%, rgba(14,165,233,.18), transparent 60%),
+      linear-gradient(180deg,#fbfdff 0%,var(--bg) 100%); }
+    .wrap { max-width:1200px; margin:0 auto; padding:1.1rem 1rem 2rem; }
+    .head { display:flex; justify-content:space-between; align-items:center; gap:.7rem; margin-bottom:1rem; }
+    h1 { margin:0; font-family:"Sora","Manrope",sans-serif; letter-spacing:-.02em; }
+    .sub { margin:.2rem 0 0 0; color:var(--muted); }
+    .btn { display:inline-block; text-decoration:none; border-radius:12px; padding:.55rem .85rem; font-weight:800; border:1px solid var(--line); color:var(--ink); background:#fff; }
+    .btn.primary { background:var(--brand); color:#fff; border-color:var(--brand); }
+    .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(275px,1fr)); gap:.8rem; }
+    .card { background:#fff; border:1px solid var(--line); border-radius:14px; padding:.8rem; box-shadow:0 10px 22px rgba(15,23,42,.06); }
+    .thumb { width:100%; height:120px; object-fit:cover; border-radius:10px; border:1px solid #dbe5f7; background:#e9effb; margin-bottom:.55rem; }
+    .cat { display:inline-block; font-size:.73rem; font-weight:700; background:#eef3ff; color:#1d4fb0; border:1px solid #d1deff; border-radius:999px; padding:.15rem .45rem; margin-bottom:.38rem; }
+    .title { margin:.08rem 0 .2rem 0; font-family:"Sora","Manrope",sans-serif; font-size:1.12rem; line-height:1.25; min-height:2.7rem; }
+    .price { margin:.15rem 0 .45rem 0; font-weight:800; font-size:1.05rem; }
+    .row { display:flex; gap:.4rem; flex-wrap:wrap; }
+    .meta { margin-top:.45rem; font-size:.78rem; color:#5b6a83; word-break:break-all; }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <div class="head">
+      <div>
+        <h1>QC Download Center</h1>
+        <p class="sub">{{ products|length }} active products with direct QC ZIP, preview, and checkout links.</p>
+      </div>
+      <div class="row">
+        <a class="btn" href="/admin?admin_token={{ admin_token_hint|urlencode }}">Admin</a>
+        <a class="btn primary" href="/admin/download-links?admin_token={{ admin_token_hint|urlencode }}" target="_blank" rel="noopener">Links JSON</a>
+      </div>
+    </div>
+
+    <section class="grid">
+      {% for p in products %}
+      <article class="card">
+        <img class="thumb" src="{{ p.cover_image }}" alt="{{ p.title }} cover">
+        <span class="cat">{{ p.category }}</span>
+        <h2 class="title">{{ p.title }}</h2>
+        <p class="price">${{ "%.2f"|format(p.price_cents / 100) }}</p>
+        <div class="row">
+          <a class="btn primary" href="/admin/download/product/{{ p.id }}.zip?admin_token={{ admin_token_hint|urlencode }}" target="_blank" rel="noopener">QC ZIP</a>
+          <a class="btn" href="/products/{{ p.id }}" target="_blank" rel="noopener">Preview</a>
+          <a class="btn" href="/checkout/{{ p.id }}" target="_blank" rel="noopener">Buy</a>
+        </div>
+        <div class="meta">ID: {{ p.id }}</div>
+      </article>
+      {% endfor %}
+    </section>
+  </main>
+</body>
+</html>
