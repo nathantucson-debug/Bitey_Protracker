@@ -80,6 +80,7 @@
         <p class="price">${{ "%.2f"|format(p.price_cents / 100) }}</p>
         <div class="row">
           <a class="btn primary" href="/products/{{ p.id }}">Preview</a>
+          <a class="btn" href="/experience/{{ p.id }}">Guided App</a>
           <a class="btn" href="/checkout/{{ p.id }}">Buy</a>
         </div>
       </article>

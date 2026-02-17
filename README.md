@@ -196,3 +196,10 @@ Option B: Manual token:
   - `09_90_Minute_Setup_Sprint.html`
   - `10_Interactive_Builder.html`
   - `11_License_and_Guarantee.html`
+  - `12_Core_Product_Template.csv`
+  - `13_Core_Product_Completed_Example.csv`
+  - `14_Script_Bank.txt`
+  - `15_Quality_Checklist.txt`
+  - `16_Guided_Interactive_Experience.html`
+- Live guided builder page:
+  - `GET /experience/<product_id>`

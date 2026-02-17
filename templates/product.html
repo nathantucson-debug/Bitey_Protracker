@@ -91,6 +91,7 @@
         <p class="tagline">{{ product.tagline }}</p>
         <p class="desc">{{ product.description }}</p>
         <p class="price">${{ "%.2f"|format(product.price_cents / 100) }}</p>
+        <p style="margin:0 0 .9rem"><a class="btn" href="/experience/{{ product.id }}">Open Guided Interactive App</a></p>
         <h3>Real-World Sample</h3>
         <div class="artifact">
           <div class="artifact-head">

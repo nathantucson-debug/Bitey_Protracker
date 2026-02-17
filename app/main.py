@@ -1114,39 +1114,471 @@ def _product_content_profile(product: dict) -> dict:
     }
 
 
-def _asset_template_file(title: str, category: str, item: str, idx: int) -> tuple[str, str]:
-    filename = f"asset_{idx:02d}_{slugify(item)[:42]}.md"
-    content = "\n".join(
-        [
-            f"# {item}",
-            "",
-            f"Product: {title}",
-            f"Category: {category}",
-            "",
-            "## What this is",
-            f"A ready-to-customize template for: {item.lower()}.",
-            "",
-            "## How to use",
-            "1. Replace bracketed placeholders with your real details.",
-            "2. Save your finalized version as a new file.",
-            "3. Use it immediately in your business or workflow.",
-            "",
-            "## Copy/Paste Template",
-            "[Title]",
-            "[Primary objective]",
-            "[Audience/use case]",
-            "[Core sections or steps]",
-            "[Call to action / next step]",
-            "",
-            "## Filled Example",
-            f"{item} - Final",
-            "Objective: improve speed, quality, and consistency.",
-            "Use case: first live rollout this week.",
-            "Sections: setup, execution, review, improvements.",
-            "Next step: publish/send/use this finalized file today.",
-        ]
+def _category_asset_blueprint(category: str) -> dict:
+    blueprints = {
+        "Creator Growth": {
+            "core_headers": ["Content Type", "Hook", "Value Angle", "CTA", "Publishing Day", "Status"],
+            "core_rows": [
+                ["Reel", "Stop wasting hours on random posts", "3-step planning framework", "Comment GUIDE", "Monday", "Ready"],
+                ["Carousel", "Most creators miss this retention fix", "Pattern interrupt + proof", "Save this", "Wednesday", "Ready"],
+                ["Email", "A simple content engine for busy weeks", "Repurpose workflow", "Reply PLAN", "Friday", "Draft"],
+            ],
+            "script_bank": [
+                "Hook: Most creators are overcomplicating growth.",
+                "Bridge: Here is the framework I use with clients.",
+                "Value: Step 1, Step 2, Step 3 in plain language.",
+                "CTA: Save this and use it for your next post.",
+            ],
+        },
+        "Creator Business": {
+            "core_headers": ["Offer", "Deliverables", "Price", "Timeline", "Buyer Outcome", "Status"],
+            "core_rows": [
+                ["Starter Package", "3 assets + revision round", "$490", "5 days", "Fast launch support", "Ready"],
+                ["Growth Package", "6 assets + messaging doc", "$990", "7 days", "Higher conversion", "Ready"],
+                ["Premium Package", "12 assets + strategy call", "$1890", "14 days", "End-to-end implementation", "Draft"],
+            ],
+            "script_bank": [
+                "Pitch opener: I help [audience] achieve [outcome] without [pain].",
+                "Proof line: Last launch improved [metric] by [result].",
+                "Offer line: I recommend starting with the Growth package.",
+                "Close: Want me to send a tailored one-page proposal?",
+            ],
+        },
+        "Ecommerce": {
+            "core_headers": ["Listing", "Primary Keyword", "Title Draft", "First Description Line", "CTA", "Status"],
+            "core_rows": [
+                ["Product 1", "wedding invite template", "Editable Wedding Invite Template", "Customize in minutes with Canva.", "Add to cart", "Ready"],
+                ["Product 2", "etsy seo toolkit", "Etsy SEO Toolkit for Digital Sellers", "Improve ranking and conversion with structured tags.", "Download now", "Ready"],
+                ["Product 3", "shopify product copy", "Shopify Product Description Swipe File", "Write clear, buyer-focused descriptions fast.", "Use this template", "Draft"],
+            ],
+            "script_bank": [
+                "Title pattern: Keyword + use case + format.",
+                "Description opener: Outcome first, feature second.",
+                "Bullet style: Keep each bullet tied to buyer benefit.",
+                "CTA: Buy now for instant access and implementation.",
+            ],
+        },
+        "Finance": {
+            "core_headers": ["Category", "Planned", "Actual", "Variance", "Action", "Owner"],
+            "core_rows": [
+                ["Revenue", "8500", "0", "0", "Update weekly", "You"],
+                ["Operating Costs", "2400", "0", "0", "Track receipts", "You"],
+                ["Savings", "1200", "0", "0", "Auto transfer", "You"],
+                ["Debt Paydown", "600", "0", "0", "Schedule payment", "You"],
+            ],
+            "script_bank": [
+                "Weekly review: check planned vs actual every Friday.",
+                "Variance trigger: investigate any category above 10%.",
+                "Cashflow rule: prioritize runway over vanity spending.",
+                "Decision note: cut, hold, or scale each major expense.",
+            ],
+        },
+        "Career": {
+            "core_headers": ["Role Target", "Core Achievement", "Resume Bullet", "Interview Story", "Application Date", "Status"],
+            "core_rows": [
+                ["Growth Marketing Manager", "Increased lead quality 31%", "Increased qualified leads 31% in 2 quarters", "Campaign optimization story", "YYYY-MM-DD", "Ready"],
+                ["Operations Lead", "Reduced cycle time 42%", "Reduced client onboarding cycle from 12 to 7 days", "Process redesign story", "YYYY-MM-DD", "Ready"],
+                ["Product Marketing Manager", "Lifted activation 18%", "Improved activation rate by 18% via onboarding revamp", "Cross-team execution story", "YYYY-MM-DD", "Draft"],
+            ],
+            "script_bank": [
+                "Resume formula: action + metric + business impact.",
+                "Interview structure: situation, action, result, reflection.",
+                "Negotiation opener: based on scope and market benchmark.",
+                "Follow-up line: concise value recap + clear next step.",
+            ],
+        },
+        "Freelance Ops": {
+            "core_headers": ["Client", "Scope", "Timeline", "Payment Terms", "Revision Policy", "Status"],
+            "core_rows": [
+                ["Client A", "Landing page copy + edits", "5 business days", "50% upfront / 50% before handoff", "2 rounds", "Ready"],
+                ["Client B", "Email sequence setup", "7 business days", "50% upfront / 50% at delivery", "2 rounds", "Ready"],
+                ["Client C", "Sales page framework", "10 business days", "Milestone billing", "3 rounds", "Draft"],
+            ],
+            "script_bank": [
+                "Scope line: includes X deliverables and Y revisions.",
+                "Timeline line: timeline assumes feedback in 48 hours.",
+                "Payment line: final assets released on final payment.",
+                "Boundary line: additional requests move to phase two.",
+            ],
+        },
+        "Wellness": {
+            "core_headers": ["Day", "Primary Focus", "Session", "Duration", "Nutrition Focus", "Status"],
+            "core_rows": [
+                ["Monday", "Strength", "Upper body session", "45m", "Protein + hydration", "Ready"],
+                ["Tuesday", "Recovery", "Walk + mobility", "30m", "Whole-food meals", "Ready"],
+                ["Wednesday", "Strength", "Lower body session", "45m", "Meal prep block", "Ready"],
+                ["Thursday", "Conditioning", "Intervals", "25m", "Balanced carbs", "Draft"],
+            ],
+            "script_bank": [
+                "Plan anchor: lock workouts first, then fit meals.",
+                "Fallback rule: use 20-minute minimum session on busy days.",
+                "Consistency note: perfection is not required for progress.",
+                "Weekly review: keep wins, adjust one friction point only.",
+            ],
+        },
+        "Family": {
+            "core_headers": ["Day", "Routine Block", "Task", "Owner", "Completion Rule", "Status"],
+            "core_rows": [
+                ["Monday", "Morning", "Breakfast + school prep", "Family", "Done by 7:45 AM", "Ready"],
+                ["Monday", "Evening", "Homework + tidy", "Kids + Parent", "Done before 8:00 PM", "Ready"],
+                ["Tuesday", "Morning", "Checklist repeat", "Family", "No missed steps", "Ready"],
+                ["Friday", "Rewards", "Point review + reward choice", "Parent", "Weekly closeout complete", "Draft"],
+            ],
+            "script_bank": [
+                "Routine cue: here is what happens next.",
+                "Reward rule: points unlock pre-agreed rewards.",
+                "Reset line: missed day is fine, restart at next block.",
+                "Check-in prompt: what felt easy, what needs adjustment?",
+            ],
+        },
+        "Events": {
+            "core_headers": ["Milestone", "Deliverable", "Owner", "Due Date", "Status", "Notes"],
+            "core_rows": [
+                ["Planning", "Finalize style + wording", "You", "YYYY-MM-DD", "Ready", ""],
+                ["Production", "Export print files", "You", "YYYY-MM-DD", "Ready", ""],
+                ["Distribution", "Send invitations/reminders", "You", "YYYY-MM-DD", "Ready", ""],
+                ["Day-of", "Run-of-show packet", "You", "YYYY-MM-DD", "Draft", ""],
+            ],
+            "script_bank": [
+                "Invite copy: include date, time, location, RSVP deadline.",
+                "Reminder copy: friendly nudge + clear action.",
+                "Vendor message: confirm quantities, timing, setup window.",
+                "Day-of note: one source of truth for all stakeholders.",
+            ],
+        },
+        "Hospitality": {
+            "core_headers": ["Guest Stage", "Message", "Delivery Channel", "Timing", "Expected Outcome", "Status"],
+            "core_rows": [
+                ["Pre-arrival", "Welcome + check-in instructions", "Message app", "24h before", "Fewer check-in questions", "Ready"],
+                ["Arrival", "Wi-Fi + essentials quick card", "Printed + digital", "Check-in time", "Faster guest setup", "Ready"],
+                ["Stay", "Local recommendations", "Guidebook", "Day 1", "Higher experience rating", "Ready"],
+                ["Checkout", "Simple checkout checklist", "Message app", "Night before", "Cleaner turnover", "Draft"],
+            ],
+            "script_bank": [
+                "Welcome line: we’re excited to host you.",
+                "Issue line: thanks for flagging this, here is our ETA.",
+                "Local guide line: our top picks by time of day.",
+                "Checkout line: short checklist + thank-you note.",
+            ],
+        },
+        "Operations": {
+            "core_headers": ["Process", "Step", "Owner", "SLA", "Quality Check", "Status"],
+            "core_rows": [
+                ["Onboarding", "Kickoff + intake", "Ops", "24h", "All required fields complete", "Ready"],
+                ["Delivery", "Create + QA output", "Ops", "48h", "Checklist pass", "Ready"],
+                ["Review", "Approval + revisions", "Ops", "24h", "Stakeholder sign-off", "Ready"],
+                ["Handoff", "Archive + report", "Ops", "24h", "Final files delivered", "Draft"],
+            ],
+            "script_bank": [
+                "Trigger: run SOP when project moves to this stage.",
+                "QA line: verify each acceptance criterion before handoff.",
+                "Escalation line: blocked items routed within 2 hours.",
+                "Closeout line: archive and report key lessons weekly.",
+            ],
+        },
+        "Productivity": {
+            "core_headers": ["Priority", "Task", "Block", "Owner", "Outcome", "Status"],
+            "core_rows": [
+                ["High", "Core outcome #1", "9:00-10:30", "You", "Shipped", "Ready"],
+                ["High", "Core outcome #2", "11:00-12:00", "You", "In review", "Ready"],
+                ["Medium", "Admin and follow-ups", "2:00-3:00", "You", "Inbox zero", "Ready"],
+                ["Medium", "Weekly review", "Friday 4:00", "You", "Next week planned", "Draft"],
+            ],
+            "script_bank": [
+                "Daily start: define top 3 outcomes before opening inbox.",
+                "Focus rule: one task per block, no context switching.",
+                "Shutdown rule: capture open loops and assign next action.",
+                "Weekly review: keep, improve, remove one workflow.",
+            ],
+        },
+        "Branding": {
+            "core_headers": ["Brand Element", "Primary Rule", "Usage Example", "Channel", "Owner", "Status"],
+            "core_rows": [
+                ["Voice", "Clear, direct, warm", "Outcome-first headlines", "Website", "Marketing", "Ready"],
+                ["Typography", "Sora + Manrope", "Consistent heading hierarchy", "All channels", "Design", "Ready"],
+                ["Color", "Primary + accent usage", "Buttons + highlights", "Website", "Design", "Ready"],
+                ["Messaging", "One core promise", "Hero section + product cards", "Storefront", "Marketing", "Draft"],
+            ],
+            "script_bank": [
+                "Brand promise: We help [audience] get [outcome] with less friction.",
+                "Headline rule: clear benefit in 6-10 words.",
+                "CTA rule: one action per section.",
+                "Consistency rule: same tone across product pages and emails.",
+            ],
+        },
+        "Real Estate": {
+            "core_headers": ["Lead Stage", "Message Goal", "Template", "Timing", "CTA", "Status"],
+            "core_rows": [
+                ["New lead", "Deliver value + trust", "Welcome + market guide", "Immediately", "Book consult", "Ready"],
+                ["Warming", "Qualify need", "Budget + timeline prompts", "+2 days", "Reply with criteria", "Ready"],
+                ["Active", "Move to showing", "Property shortlist message", "+5 days", "Pick showing slots", "Ready"],
+                ["Closing", "Reduce friction", "Offer support checklist", "+8 days", "Confirm next step", "Draft"],
+            ],
+            "script_bank": [
+                "Intro: thanks for reaching out, here is your guide.",
+                "Qualification: what is your timeline and target area?",
+                "Nurture: here are top 3 listings matching your criteria.",
+                "Close: want two showing options for this week?",
+            ],
+        },
+    }
+    return blueprints.get(
+        category,
+        {
+            "core_headers": ["Asset", "Purpose", "Primary Action", "Timing", "Outcome", "Status"],
+            "core_rows": [
+                ["Core template", "First implementation", "Customize with your details", "Today", "Ready-to-use output", "Ready"],
+                ["Execution sheet", "Track completion", "Run one full pass", "This week", "First outcome recorded", "Ready"],
+                ["Optimization note", "Refine quality", "Apply one improvement", "Week 2", "Better performance", "Draft"],
+            ],
+            "script_bank": [
+                "Define a clear outcome before you customize files.",
+                "Complete one full pass before optimizing details.",
+                "Track weekly metrics to measure quality and consistency.",
+                "Save your final version as the reusable baseline.",
+            ],
+        },
     )
-    return filename, content
+
+
+def _guided_experience_html(product: dict) -> str:
+    title = product.get("title", "Digital Product")
+    category = product.get("category", "General")
+    profile = _product_content_profile(product)
+    blueprint = _category_asset_blueprint(category)
+    data = {
+        "title": title,
+        "category": category,
+        "tagline": product.get("tagline", ""),
+        "description": product.get("description", ""),
+        "included": product.get("preview_items", []),
+        "plan_rows": profile.get("plan_rows", []),
+        "scripts": blueprint.get("script_bank", []),
+    }
+    payload = json.dumps(data)
+    return f"""<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{html.escape(title)} - Guided Experience</title>
+<style>
+body{{margin:0;font-family:Manrope,Segoe UI,sans-serif;background:#eff4ff;color:#0f172a}}
+.wrap{{max-width:1100px;margin:0 auto;padding:22px}}
+.hero{{background:#fff;border:1px solid #d8e2f5;border-radius:16px;padding:18px 20px;box-shadow:0 14px 30px rgba(15,23,42,.08)}}
+.hero h1{{margin:0 0 8px;font-size:2rem;font-family:Sora,Manrope,sans-serif}}
+.muted{{color:#475569}}
+.pill{{display:inline-block;font-size:.78rem;padding:5px 10px;border-radius:999px;background:#edf3ff;border:1px solid #d4e0ff;color:#1e40af;font-weight:700}}
+.grid{{display:grid;grid-template-columns:260px 1fr;gap:14px;margin-top:14px}}
+.side,.main{{background:#fff;border:1px solid #d8e2f5;border-radius:16px;padding:16px;box-shadow:0 10px 24px rgba(15,23,42,.06)}}
+.step{{padding:10px;border:1px solid #dbe5f8;border-radius:10px;margin-bottom:8px;font-weight:700;background:#f8fbff}}
+.section{{margin-bottom:16px;padding:12px;border:1px solid #e3ebfb;border-radius:12px}}
+.section h3{{margin:0 0 8px;font-family:Sora,Manrope,sans-serif}}
+label{{display:block;font-size:.85rem;font-weight:700;margin:8px 0 4px;color:#334155}}
+input,textarea,select{{width:100%;border:1px solid #cfdaf1;border-radius:10px;padding:10px;font:inherit}}
+textarea{{min-height:90px}}
+table{{width:100%;border-collapse:collapse;font-size:.93rem}}
+th,td{{border:1px solid #e5edfb;padding:8px;vertical-align:top;text-align:left}}
+th{{background:#f8fbff}}
+td[contenteditable="true"]{{background:#ffffff}}
+.row{{display:flex;gap:10px;flex-wrap:wrap}}
+button{{border:1px solid #1d4ed8;background:#1d4ed8;color:#fff;padding:10px 14px;border-radius:10px;font-weight:700;cursor:pointer}}
+button.alt{{background:#fff;color:#0f172a;border-color:#cdd8f1}}
+.box{{padding:10px;border:1px solid #d9e4fb;border-radius:10px;background:#f9fbff;margin:8px 0}}
+@media (max-width:900px){{.grid{{grid-template-columns:1fr}}}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <section class="hero">
+    <span class="pill">{html.escape(category)}</span>
+    <h1>{html.escape(title)} Guided Builder</h1>
+    <p class="muted"><strong>{html.escape(product.get("tagline", ""))}</strong></p>
+    <p class="muted">{html.escape(product.get("description", ""))}</p>
+  </section>
+
+  <section class="grid">
+    <aside class="side">
+      <div class="step">1. Setup Profile</div>
+      <div class="step">2. Customize Deliverables</div>
+      <div class="step">3. Script Studio</div>
+      <div class="step">4. Execution Board</div>
+      <div class="step">5. Export Your Product</div>
+      <div class="box"><strong>Included assets</strong><ul id="included-list" style="padding-left:18px;margin:8px 0 0"></ul></div>
+    </aside>
+    <main class="main">
+      <div class="section">
+        <h3>Setup Profile</h3>
+        <label>Brand or Business Name</label>
+        <input id="biz_name" placeholder="Your business name">
+        <label>Target Audience</label>
+        <input id="audience" placeholder="Who this is for">
+        <label>Main Outcome</label>
+        <input id="outcome" placeholder="What result buyer gets">
+      </div>
+
+      <div class="section">
+        <h3>Customize Deliverables</h3>
+        <div id="deliverables"></div>
+      </div>
+
+      <div class="section">
+        <h3>Script Studio</h3>
+        <div id="script_bank"></div>
+        <label>Your Final Script</label>
+        <textarea id="final_script" placeholder="Build your final customer-facing script here"></textarea>
+      </div>
+
+      <div class="section">
+        <h3>Execution Board</h3>
+        <table id="plan_tbl">
+          <thead><tr><th>Step</th><th>Deliverable</th><th>Action</th><th>Due</th><th>Expected Outcome</th><th>Status</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <div class="section">
+        <h3>Export Your Product</h3>
+        <div class="row">
+          <button type="button" onclick="saveProgress()">Save Progress</button>
+          <button type="button" class="alt" onclick="loadProgress()">Load Saved</button>
+          <button type="button" onclick="downloadJson()">Download Product JSON</button>
+          <button type="button" class="alt" onclick="downloadCsv()">Download Execution CSV</button>
+        </div>
+      </div>
+    </main>
+  </section>
+</div>
+
+<script>
+const payload = {payload};
+const includedList = document.getElementById("included-list");
+payload.included.forEach(item => {{
+  const li = document.createElement("li");
+  li.textContent = item;
+  includedList.appendChild(li);
+}});
+
+const deliverables = document.getElementById("deliverables");
+payload.included.forEach((item, i) => {{
+  const box = document.createElement("div");
+  box.className = "box";
+  box.innerHTML = `<label>${{item}} - Buyer-ready content</label><textarea id="deliverable_${{i}}" placeholder="Write the finalized content your buyer will actually use"></textarea>`;
+  deliverables.appendChild(box);
+}});
+
+const bank = document.getElementById("script_bank");
+payload.scripts.forEach(line => {{
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = "alt";
+  b.style.margin = "0 8px 8px 0";
+  b.textContent = line;
+  b.onclick = () => {{
+    const t = document.getElementById("final_script");
+    t.value = (t.value ? t.value + "\\n" : "") + line;
+  }};
+  bank.appendChild(b);
+}});
+
+const tbody = document.querySelector("#plan_tbl tbody");
+payload.plan_rows.forEach((row, idx) => {{
+  const tr = document.createElement("tr");
+  tr.innerHTML = `
+    <td>${{row[0] || `Step ${{idx+1}}`}}</td>
+    <td contenteditable="true">${{row[1] || ""}}</td>
+    <td contenteditable="true">${{row[2] || ""}}</td>
+    <td contenteditable="true">${{row[3] || ""}}</td>
+    <td contenteditable="true">${{row[4] || ""}}</td>
+    <td>
+      <select>
+        <option>Not Started</option>
+        <option>In Progress</option>
+        <option>Completed</option>
+      </select>
+    </td>`;
+  tbody.appendChild(tr);
+}});
+
+function captureState() {{
+  return {{
+    meta: {{
+      title: payload.title,
+      category: payload.category,
+      biz_name: document.getElementById("biz_name").value,
+      audience: document.getElementById("audience").value,
+      outcome: document.getElementById("outcome").value
+    }},
+    deliverables: payload.included.map((_, i) => document.getElementById(`deliverable_${{i}}`)?.value || ""),
+    final_script: document.getElementById("final_script").value,
+    plan: [...document.querySelectorAll("#plan_tbl tbody tr")].map(r => {{
+      const cells = [...r.querySelectorAll("td")];
+      return {{
+        step: cells[0]?.innerText?.trim() || "",
+        deliverable: cells[1]?.innerText?.trim() || "",
+        action: cells[2]?.innerText?.trim() || "",
+        due: cells[3]?.innerText?.trim() || "",
+        result: cells[4]?.innerText?.trim() || "",
+        status: r.querySelector("select")?.value || "Not Started"
+      }};
+    }})
+  }};
+}}
+
+function saveProgress() {{
+  localStorage.setItem("northstar_guided_experience", JSON.stringify(captureState()));
+  alert("Saved.");
+}}
+
+function loadProgress() {{
+  const raw = localStorage.getItem("northstar_guided_experience");
+  if (!raw) return;
+  const state = JSON.parse(raw);
+  document.getElementById("biz_name").value = state.meta?.biz_name || "";
+  document.getElementById("audience").value = state.meta?.audience || "";
+  document.getElementById("outcome").value = state.meta?.outcome || "";
+  (state.deliverables || []).forEach((v, i) => {{
+    const el = document.getElementById(`deliverable_${{i}}`);
+    if (el) el.value = v || "";
+  }});
+  document.getElementById("final_script").value = state.final_script || "";
+  if (state.plan?.length) {{
+    const rows = [...document.querySelectorAll("#plan_tbl tbody tr")];
+    rows.forEach((r, i) => {{
+      const row = state.plan[i];
+      if (!row) return;
+      const cells = [...r.querySelectorAll("td")];
+      if (cells[1]) cells[1].innerText = row.deliverable || "";
+      if (cells[2]) cells[2].innerText = row.action || "";
+      if (cells[3]) cells[3].innerText = row.due || "";
+      if (cells[4]) cells[4].innerText = row.result || "";
+      const sel = r.querySelector("select");
+      if (sel) sel.value = row.status || "Not Started";
+    }});
+  }}
+}}
+
+function download(name, type, content) {{
+  const blob = new Blob([content], {{type}});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  a.click();
+}}
+
+function downloadJson() {{
+  download("guided-experience-export.json", "application/json", JSON.stringify(captureState(), null, 2));
+}}
+
+function downloadCsv() {{
+  const rows = [["Step","Deliverable","Action","Due","Expected Outcome","Status"]];
+  captureState().plan.forEach(r => rows.push([r.step,r.deliverable,r.action,r.due,r.result,r.status]));
+  const esc = v => `"${{String(v||"").replaceAll('"','""')}}"`;
+  download("guided-execution-board.csv", "text/csv;charset=utf-8", rows.map(r => r.map(esc).join(",")).join("\\n"));
+}}
+</script>
+</body>
+</html>"""
 
 
 def _customer_pack_files(product: dict) -> list[tuple[str, str]]:
@@ -1343,6 +1775,26 @@ function exportCsv() {{
 }}
 </script></body></html>"""
 
+    blueprint = _category_asset_blueprint(category)
+    core_template_csv = _csv_block(blueprint["core_headers"], blueprint["core_rows"])
+    filled_rows = [list(r) for r in blueprint["core_rows"]]
+    if filled_rows:
+        filled_rows[0][-1] = "Completed"
+    filled_example_csv = _csv_block(blueprint["core_headers"], filled_rows)
+    quality_checklist_txt = "\n".join(
+        [
+            f"{title} - Quality Checklist",
+            "",
+            "Before delivering or publishing, confirm:",
+            "- The buyer-facing file has real, customized content.",
+            "- No placeholder/internal notes remain.",
+            "- Dates, names, and numbers are accurate.",
+            "- The file can be used immediately by a customer.",
+            "- A completed example is included.",
+        ]
+    )
+    script_bank_txt = "\n".join([f"{title} - Script Bank", ""] + [f"- {line}" for line in blueprint["script_bank"]])
+
     files = [
         ("00_READ_FIRST.txt", readme_txt),
         ("01_Start_Here.html", start_here_html),
@@ -1356,9 +1808,22 @@ function exportCsv() {{
         ("09_90_Minute_Setup_Sprint.html", setup_html),
         ("10_Interactive_Builder.html", workspace_html),
         ("11_License_and_Guarantee.html", license_html),
+        ("12_Core_Product_Template.csv", core_template_csv),
+        ("13_Core_Product_Completed_Example.csv", filled_example_csv),
+        ("14_Script_Bank.txt", script_bank_txt),
+        ("15_Quality_Checklist.txt", quality_checklist_txt),
+        ("16_Guided_Interactive_Experience.html", _guided_experience_html(product)),
     ]
     for i, item in enumerate(included, start=1):
-        files.append(_asset_template_file(title, category, item, i))
+        item_sheet = _csv_block(
+            ["Section", "Buyer Action", "Filled Example"],
+            [
+                [f"{item} - Setup", "Customize with your real details", f"{item} customized and ready"],
+                [f"{item} - Execution", "Use in your live workflow", f"{item} used with first customer/run"],
+                [f"{item} - Review", "Capture improvements", f"{item} optimized for next cycle"],
+            ],
+        )
+        files.append((f"asset_{i:02d}_{slugify(item)[:42]}.csv", item_sheet))
     return files
 
 
@@ -2875,6 +3340,14 @@ def product_detail(product_id: str):
         lead_status=lead_status,
         order_bump=ORDER_BUMP,
     )
+
+
+@app.get("/experience/<product_id>")
+def product_experience(product_id: str):
+    product = get_product(product_id)
+    if not product:
+        return jsonify({"error": "product not found"}), 404
+    return Response(_guided_experience_html(product), mimetype="text/html")
 
 
 @app.get("/bundle/<bundle_key>")
