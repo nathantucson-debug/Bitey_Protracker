@@ -10,7 +10,7 @@ import smtplib
 import threading
 import uuid
 import zipfile
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from email.message import EmailMessage
 from urllib import parse, request
 from urllib.error import HTTPError, URLError
@@ -2031,6 +2031,173 @@ def run_virtual_product_test(product: dict, occupation: str) -> dict:
     }
 
 
+def _sales_funnel_snapshot(days: int = 30) -> dict:
+    since = (datetime.now(timezone.utc) - timedelta(days=max(1, days))).isoformat()
+    conn = db()
+    sales_row = conn.execute(
+        "SELECT COUNT(*) AS c, COALESCE(SUM(amount_cents), 0) AS gross FROM sales WHERE created_at >= ?",
+        (since,),
+    ).fetchone()
+    leads_row = conn.execute(
+        "SELECT COUNT(*) AS c FROM leads WHERE created_at >= ?",
+        (since,),
+    ).fetchone()
+    deliveries_row = conn.execute(
+        "SELECT COUNT(*) AS c, SUM(CASE WHEN status='sent' THEN 1 ELSE 0 END) AS sent FROM deliveries WHERE created_at >= ?",
+        (since,),
+    ).fetchone()
+    conn.close()
+    sales_count = int(sales_row["c"] if sales_row else 0)
+    leads_count = int(leads_row["c"] if leads_row else 0)
+    delivery_total = int(deliveries_row["c"] if deliveries_row else 0)
+    delivery_sent = int(deliveries_row["sent"] if deliveries_row and deliveries_row["sent"] is not None else 0)
+    gross = int(sales_row["gross"] if sales_row else 0)
+    lead_to_sale = round((sales_count / leads_count) * 100, 1) if leads_count else 0.0
+    delivery_rate = round((delivery_sent / delivery_total) * 100, 1) if delivery_total else 0.0
+    return {
+        "window_days": days,
+        "sales_count": sales_count,
+        "gross_cents": gross,
+        "gross_usd": round(gross / 100, 2),
+        "leads_count": leads_count,
+        "lead_to_sale_rate_pct": lead_to_sale,
+        "delivery_events": delivery_total,
+        "delivery_success_rate_pct": delivery_rate,
+    }
+
+
+def _category_distribution(products: list[dict]) -> dict:
+    counts: dict[str, int] = {}
+    for p in products:
+        cat = p.get("category", "General")
+        counts[cat] = counts.get(cat, 0) + 1
+    return counts
+
+
+def _pricing_analysis(products: list[dict]) -> list[dict]:
+    by_category: dict[str, list[int]] = {}
+    for p in products:
+        by_category.setdefault(p.get("category", "General"), []).append(int(p.get("price_cents", 0)))
+    results: list[dict] = []
+    for cat, vals in by_category.items():
+        avg = int(sum(vals) / max(1, len(vals)))
+        lo = min(vals)
+        hi = max(vals)
+        spread_pct = round(((hi - lo) / max(1, avg)) * 100, 1)
+        results.append(
+            {
+                "category": cat,
+                "count": len(vals),
+                "avg_price_usd": round(avg / 100, 2),
+                "min_price_usd": round(lo / 100, 2),
+                "max_price_usd": round(hi / 100, 2),
+                "spread_pct_of_avg": spread_pct,
+            }
+        )
+    return sorted(results, key=lambda x: x["count"], reverse=True)
+
+
+def build_ai_team_report(occupation: str, limit: int = 50) -> dict:
+    products = list_products()[: max(1, min(200, limit))]
+    qa_reports = [run_virtual_product_test(p, occupation) for p in products]
+    failed = [r for r in qa_reports if not r.get("passed")]
+    failed_sorted = sorted(failed, key=lambda r: int(r.get("overall_score", 0)))
+    avg_score = int(round(sum(int(r.get("overall_score", 0)) for r in qa_reports) / max(1, len(qa_reports))))
+
+    category_counts = _category_distribution(products)
+    thin_categories = [{"category": c, "count": n} for c, n in category_counts.items() if n < 3]
+    thin_categories = sorted(thin_categories, key=lambda x: x["count"])
+
+    pricing = _pricing_analysis(products)
+    funnel = _sales_funnel_snapshot(days=30)
+
+    priorities: list[dict] = []
+    if failed_sorted:
+        top = failed_sorted[:10]
+        priorities.append(
+            {
+                "owner": "Product QA Agent",
+                "priority": "P0",
+                "why": f"{len(failed_sorted)} products are below sale-ready threshold.",
+                "action": "Fix the 10 lowest-scoring products first using issues from the QA report.",
+                "targets": [{"title": r["product"]["title"], "score": r["overall_score"]} for r in top],
+            }
+        )
+    if thin_categories:
+        priorities.append(
+            {
+                "owner": "Market Agent",
+                "priority": "P1",
+                "why": "Category coverage is thin in some areas.",
+                "action": "Add at least 2 high-quality products in each thin category.",
+                "targets": thin_categories,
+            }
+        )
+    if funnel["lead_to_sale_rate_pct"] < 5:
+        priorities.append(
+            {
+                "owner": "Conversion Agent",
+                "priority": "P1",
+                "why": f"Lead-to-sale rate is low at {funnel['lead_to_sale_rate_pct']}%.",
+                "action": "Improve product page proof, add stronger offer framing, and tighten checkout copy.",
+                "targets": [{"metric": "lead_to_sale_rate_pct", "value": funnel["lead_to_sale_rate_pct"]}],
+            }
+        )
+    if funnel["delivery_success_rate_pct"] < 95:
+        priorities.append(
+            {
+                "owner": "Delivery Agent",
+                "priority": "P1",
+                "why": f"Delivery success is {funnel['delivery_success_rate_pct']}%.",
+                "action": "Audit failed delivery notes and harden email delivery fallback.",
+                "targets": [{"metric": "delivery_success_rate_pct", "value": funnel["delivery_success_rate_pct"]}],
+            }
+        )
+    if not priorities:
+        priorities.append(
+            {
+                "owner": "Growth Agent",
+                "priority": "P2",
+                "why": "Core product quality and funnel health are stable.",
+                "action": "Scale top categories and increase average order value with curated bundles.",
+                "targets": [],
+            }
+        )
+
+    return {
+        "ok": True,
+        "generated_at": utc_now_iso(),
+        "occupation_target": occupation,
+        "products_scanned": len(products),
+        "qa_summary": {
+            "average_score": avg_score,
+            "passed": len(qa_reports) - len(failed),
+            "failed": len(failed),
+            "threshold": 80,
+        },
+        "market_agent": {
+            "category_distribution": category_counts,
+            "thin_categories": thin_categories,
+        },
+        "pricing_agent": {
+            "category_pricing": pricing,
+        },
+        "funnel_agent": funnel,
+        "priority_actions": priorities,
+        "lowest_scoring_products": [
+            {
+                "id": r["product"]["id"],
+                "title": r["product"]["title"],
+                "category": r["product"]["category"],
+                "score": r["overall_score"],
+                "issues": r.get("issues", []),
+                "recommendations": r.get("recommendations", []),
+            }
+            for r in failed_sorted[:15]
+        ],
+    }
+
+
 def real_world_preview(title: str) -> dict:
     previews = {
         "Creator Caption Vault": {
@@ -3778,6 +3945,15 @@ def admin_test_agent_all():
             "results": reports,
         }
     )
+
+
+@app.get("/admin/ai-team/report")
+def admin_ai_team_report():
+    if not admin_guard_any():
+        return jsonify({"error": "unauthorized"}), 401
+    occupation = (flask_request.args.get("occupation") or "small business owner").strip()
+    limit = int(flask_request.args.get("limit") or "50")
+    return jsonify(build_ai_team_report(occupation, limit=limit))
 
 
 @app.get("/checkout/<product_id>")

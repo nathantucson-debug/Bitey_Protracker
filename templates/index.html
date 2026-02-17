@@ -75,6 +75,24 @@
     }
     .actions { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.8rem; }
     .status-line { margin-top: 0.6rem; font-size: 0.9rem; color: var(--muted); }
+    .input {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 0.45rem 0.6rem;
+      font: inherit;
+      min-width: 220px;
+    }
+    .report {
+      margin-top: 0.8rem;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 0.75rem;
+      background: #f9fbff;
+      max-height: 360px;
+      overflow: auto;
+      white-space: pre-wrap;
+      font-size: 0.85rem;
+    }
     @media (max-width: 640px) {
       th, td { font-size: 0.85rem; }
     }
@@ -88,6 +106,19 @@
       Public storefront: <a href="/store" target="_blank" rel="noopener">/store</a> | Home: <a href="/" target="_blank" rel="noopener">/</a>
     </p>
     <div class="grid">
+      <section class="card">
+        <h2>AI Team Command Center</h2>
+        <p>Run multi-agent product intelligence (market, QA, pricing, funnel) and get prioritized fixes.</p>
+        <div class="actions">
+          <input id="ai-occupation" class="input" type="text" value="small business owner" placeholder="Target occupation">
+          <input id="ai-limit" class="input" type="number" value="50" min="1" max="200" step="1">
+          <button class="btn primary" type="button" onclick="runAiTeamReport()">Run AI Team</button>
+          <button class="btn" type="button" onclick="runAiTeamReport(true)">Show Failed Only</button>
+        </div>
+        <div id="ai-status" class="status-line">Ready.</div>
+        <pre id="ai-report" class="report">Run the AI Team to see guidance.</pre>
+      </section>
+
       <section class="card">
         <h2>Etsy Integration</h2>
         {% if not etsy_enabled %}
@@ -338,5 +369,40 @@
       </section>
     </div>
   </main>
+  <script>
+    async function runAiTeamReport(failedOnly = false) {
+      const occupation = document.getElementById("ai-occupation").value.trim() || "small business owner";
+      const limit = document.getElementById("ai-limit").value || "50";
+      const status = document.getElementById("ai-status");
+      const out = document.getElementById("ai-report");
+      status.textContent = "Running AI team report...";
+      try {
+        const token = {{ admin_token_hint|tojson }};
+        const url = `/admin/ai-team/report?occupation=${encodeURIComponent(occupation)}&limit=${encodeURIComponent(limit)}&admin_token=${encodeURIComponent(token || "")}`;
+        const res = await fetch(url);
+        const data = await res.json();
+        if (!res.ok) {
+          status.textContent = "Error";
+          out.textContent = JSON.stringify(data, null, 2);
+          return;
+        }
+        status.textContent = `Done. Avg score ${data?.qa_summary?.average_score ?? "n/a"} | Failed ${data?.qa_summary?.failed ?? "n/a"}`;
+        if (failedOnly) {
+          out.textContent = JSON.stringify({
+            generated_at: data.generated_at,
+            occupation_target: data.occupation_target,
+            qa_summary: data.qa_summary,
+            priority_actions: data.priority_actions,
+            lowest_scoring_products: data.lowest_scoring_products
+          }, null, 2);
+          return;
+        }
+        out.textContent = JSON.stringify(data, null, 2);
+      } catch (err) {
+        status.textContent = "Error";
+        out.textContent = String(err);
+      }
+    }
+  </script>
 </body>
 </html>

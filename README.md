@@ -206,3 +206,5 @@ Option B: Manual token:
 - Virtual product testing agent (admin token required):
   - `GET /admin/test-agent?product_id=<id>&occupation=<job title>&admin_token=<ADMIN_TOKEN>`
   - `GET /admin/test-agent/all?occupation=<job title>&limit=50&admin_token=<ADMIN_TOKEN>`
+- AI Team strategic report (admin token required):
+  - `GET /admin/ai-team/report?occupation=<job title>&limit=50&admin_token=<ADMIN_TOKEN>`
