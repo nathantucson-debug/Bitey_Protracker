@@ -2310,6 +2310,35 @@ def run_ai_team_autofix(occupation: str, limit: int = 50, min_score: int = 80, m
     }
 
 
+def generate_ai_fix_proposals(occupation: str, limit: int = 50, min_score: int = 80, max_proposals: int = 20) -> dict:
+    report = build_ai_team_report(occupation, limit=limit)
+    fail_candidates = report.get("lowest_scoring_products", [])
+    to_fix = [x for x in fail_candidates if int(x.get("score", 0)) < min_score][: max(1, min(200, max_proposals))]
+    created = []
+    for item in to_fix:
+        product = get_product(item.get("id", ""))
+        if not product:
+            continue
+        payload = _autofix_content_for_product(product, occupation)
+        proposal = save_ai_fix_proposal(
+            product_id=product["id"],
+            title=product["title"],
+            occupation=occupation,
+            prior_score=int(item.get("score", 0)),
+            payload=payload,
+            status="pending",
+            notes="ai generated proposal",
+        )
+        created.append(proposal)
+    return {
+        "ok": True,
+        "occupation_target": occupation,
+        "min_score_threshold": min_score,
+        "created_count": len(created),
+        "proposals": created,
+    }
+
+
 def real_world_preview(title: str) -> dict:
     previews = {
         "Creator Caption Vault": {
@@ -2641,6 +2670,22 @@ def init_db() -> None:
         )
         """
     )
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS ai_fix_proposals (
+            id TEXT PRIMARY KEY,
+            product_id TEXT NOT NULL,
+            title TEXT NOT NULL,
+            occupation TEXT NOT NULL,
+            prior_score INTEGER NOT NULL,
+            payload_json TEXT NOT NULL,
+            status TEXT NOT NULL,
+            notes TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )
+        """
+    )
     conn.commit()
     conn.close()
 
@@ -2714,6 +2759,151 @@ def save_content_override(
     )
     conn.commit()
     conn.close()
+
+
+def list_content_overrides(limit: int = 200) -> list[dict]:
+    conn = db()
+    rows = conn.execute(
+        """
+        SELECT title, category, tagline, preview_snippet, updated_at
+        FROM product_content_overrides
+        ORDER BY updated_at DESC
+        LIMIT ?
+        """,
+        (max(1, min(limit, 1000)),),
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def save_ai_fix_proposal(
+    product_id: str,
+    title: str,
+    occupation: str,
+    prior_score: int,
+    payload: dict,
+    status: str = "pending",
+    notes: str = "",
+) -> dict:
+    now = utc_now_iso()
+    proposal_id = str(uuid.uuid4())
+    conn = db()
+    # keep only one pending proposal per product
+    conn.execute(
+        "DELETE FROM ai_fix_proposals WHERE product_id = ? AND status = 'pending'",
+        (product_id,),
+    )
+    conn.execute(
+        """
+        INSERT INTO ai_fix_proposals
+        (id, product_id, title, occupation, prior_score, payload_json, status, notes, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            proposal_id,
+            product_id,
+            title,
+            occupation,
+            int(prior_score),
+            json.dumps(payload),
+            status,
+            notes,
+            now,
+            now,
+        ),
+    )
+    conn.commit()
+    conn.close()
+    return {
+        "id": proposal_id,
+        "product_id": product_id,
+        "title": title,
+        "occupation": occupation,
+        "prior_score": int(prior_score),
+        "status": status,
+    }
+
+
+def list_ai_fix_proposals(status: str | None = "pending", limit: int = 200) -> list[dict]:
+    conn = db()
+    if status:
+        rows = conn.execute(
+            """
+            SELECT id, product_id, title, occupation, prior_score, status, notes, created_at, updated_at
+            FROM ai_fix_proposals
+            WHERE status = ?
+            ORDER BY created_at DESC
+            LIMIT ?
+            """,
+            (status, max(1, min(limit, 2000))),
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            """
+            SELECT id, product_id, title, occupation, prior_score, status, notes, created_at, updated_at
+            FROM ai_fix_proposals
+            ORDER BY created_at DESC
+            LIMIT ?
+            """,
+            (max(1, min(limit, 2000)),),
+        ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def get_ai_fix_proposal(proposal_id: str) -> dict | None:
+    conn = db()
+    row = conn.execute(
+        """
+        SELECT id, product_id, title, occupation, prior_score, payload_json, status, notes, created_at, updated_at
+        FROM ai_fix_proposals
+        WHERE id = ?
+        """,
+        (proposal_id,),
+    ).fetchone()
+    conn.close()
+    if not row:
+        return None
+    data = dict(row)
+    try:
+        data["payload"] = json.loads(data.get("payload_json") or "{}")
+    except Exception:
+        data["payload"] = {}
+    return data
+
+
+def set_ai_fix_proposal_status(proposal_id: str, status: str, notes: str = "") -> None:
+    conn = db()
+    conn.execute(
+        """
+        UPDATE ai_fix_proposals
+        SET status = ?, notes = ?, updated_at = ?
+        WHERE id = ?
+        """,
+        (status, notes, utc_now_iso(), proposal_id),
+    )
+    conn.commit()
+    conn.close()
+
+
+def apply_ai_fix_proposal(proposal_id: str) -> dict:
+    proposal = get_ai_fix_proposal(proposal_id)
+    if not proposal:
+        raise ValueError("proposal not found")
+    payload = proposal.get("payload") or {}
+    title = payload.get("title") or proposal.get("title")
+    if not title:
+        raise ValueError("proposal missing title")
+    save_content_override(
+        title=title,
+        category=payload.get("category") or "General",
+        tagline=payload.get("tagline") or "",
+        description=payload.get("description") or "",
+        preview_items=payload.get("preview_items") or [],
+        preview_snippet=payload.get("preview_snippet") or "",
+    )
+    set_ai_fix_proposal_status(proposal_id, "applied", notes="approved and applied")
+    return {"ok": True, "id": proposal_id, "title": title}
 
 
 def get_product(product_id: str) -> dict | None:
@@ -3911,6 +4101,8 @@ def dashboard():
     etsy_listings = list_channel_listings("etsy", limit=50)
     gumroad_listings = list_channel_listings("gumroad", limit=50)
     shopify_listings = list_channel_listings("shopify", limit=50)
+    ai_fix_queue = list_ai_fix_proposals(status="pending", limit=100)
+    overrides = list_content_overrides(limit=100)
     return render_template(
         "index.html",
         products=products,
@@ -3930,6 +4122,8 @@ def dashboard():
         shopify_oauth_enabled=shopify_oauth_enabled(),
         shopify_connected=bool(shopify_conn) or bool(normalize_shop_domain(SHOPIFY_STORE_DOMAIN) and SHOPIFY_ACCESS_TOKEN.strip()),
         shopify_store=(shopify_conn or {}).get("account_id", normalize_shop_domain(SHOPIFY_STORE_DOMAIN)),
+        ai_fix_queue=ai_fix_queue,
+        overrides=overrides,
     )
 
 
@@ -4136,6 +4330,94 @@ def admin_ai_team_report():
     occupation = (flask_request.args.get("occupation") or "small business owner").strip()
     limit = int(flask_request.args.get("limit") or "50")
     return jsonify(build_ai_team_report(occupation, limit=limit))
+
+
+@app.post("/admin/ai-team/proposals/generate")
+def admin_ai_team_generate_proposals():
+    if not admin_guard_any():
+        return jsonify({"error": "unauthorized"}), 401
+    occupation = (
+        flask_request.form.get("occupation")
+        or flask_request.args.get("occupation")
+        or "small business owner"
+    ).strip()
+    limit = int(flask_request.form.get("limit") or flask_request.args.get("limit") or "50")
+    min_score = int(flask_request.form.get("min_score") or flask_request.args.get("min_score") or "80")
+    max_proposals = int(flask_request.form.get("max_proposals") or flask_request.args.get("max_proposals") or "20")
+    result = generate_ai_fix_proposals(occupation, limit=limit, min_score=min_score, max_proposals=max_proposals)
+    if (flask_request.form.get("redirect") or "") == "1":
+        token = admin_token_value()
+        return redirect(
+            f"/admin?admin_token={parse.quote(token)}&proposals=done&created={result.get('created_count', 0)}",
+            code=302,
+        )
+    return jsonify(result)
+
+
+@app.get("/admin/ai-team/proposals")
+def admin_ai_team_list_proposals():
+    if not admin_guard_any():
+        return jsonify({"error": "unauthorized"}), 401
+    status = (flask_request.args.get("status") or "pending").strip()
+    if status.lower() == "all":
+        status = None
+    return jsonify({"ok": True, "proposals": list_ai_fix_proposals(status=status, limit=500)})
+
+
+@app.post("/admin/ai-team/proposals/<proposal_id>/apply")
+def admin_ai_team_apply_proposal(proposal_id: str):
+    if not admin_guard_any():
+        return jsonify({"error": "unauthorized"}), 401
+    try:
+        result = apply_ai_fix_proposal(proposal_id)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 404
+    if (flask_request.form.get("redirect") or "") == "1":
+        token = admin_token_value()
+        return redirect(f"/admin?admin_token={parse.quote(token)}&applied=1", code=302)
+    return jsonify(result)
+
+
+@app.post("/admin/ai-team/proposals/<proposal_id>/reject")
+def admin_ai_team_reject_proposal(proposal_id: str):
+    if not admin_guard_any():
+        return jsonify({"error": "unauthorized"}), 401
+    if not get_ai_fix_proposal(proposal_id):
+        return jsonify({"error": "proposal not found"}), 404
+    set_ai_fix_proposal_status(proposal_id, "rejected", notes="manually rejected")
+    if (flask_request.form.get("redirect") or "") == "1":
+        token = admin_token_value()
+        return redirect(f"/admin?admin_token={parse.quote(token)}&rejected=1", code=302)
+    return jsonify({"ok": True, "id": proposal_id, "status": "rejected"})
+
+
+@app.post("/admin/ai-team/proposals/apply-all")
+def admin_ai_team_apply_all_proposals():
+    if not admin_guard_any():
+        return jsonify({"error": "unauthorized"}), 401
+    pending = list_ai_fix_proposals(status="pending", limit=500)
+    applied = []
+    errors = []
+    for p in pending:
+        try:
+            applied.append(apply_ai_fix_proposal(p["id"]))
+        except Exception as exc:
+            errors.append({"id": p["id"], "title": p.get("title"), "error": str(exc)})
+    result = {"ok": True, "applied_count": len(applied), "error_count": len(errors), "errors": errors}
+    if (flask_request.form.get("redirect") or "") == "1":
+        token = admin_token_value()
+        return redirect(
+            f"/admin?admin_token={parse.quote(token)}&applied_all={len(applied)}&apply_errors={len(errors)}",
+            code=302,
+        )
+    return jsonify(result)
+
+
+@app.get("/admin/inventory-overrides")
+def admin_inventory_overrides():
+    if not admin_guard_any():
+        return jsonify({"error": "unauthorized"}), 401
+    return jsonify({"ok": True, "overrides": list_content_overrides(limit=500)})
 
 
 @app.post("/admin/ai-team/autofix")

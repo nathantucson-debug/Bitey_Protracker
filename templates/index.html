@@ -115,17 +115,73 @@
           <button class="btn primary" type="button" onclick="runAiTeamReport()">Run AI Team</button>
           <button class="btn" type="button" onclick="runAiTeamReport(true)">Show Failed Only</button>
         </div>
-        <form class="actions" action="/admin/ai-team/autofix" method="POST">
+        <form class="actions" action="/admin/ai-team/proposals/generate" method="POST">
           <input type="hidden" name="admin_token" value="{{ admin_token_hint }}">
           <input type="hidden" name="redirect" value="1">
-          <input id="ai-occupation-form" class="input" type="text" name="occupation" value="small business owner" placeholder="Occupation for autofix">
+          <input id="ai-occupation-form" class="input" type="text" name="occupation" value="small business owner" placeholder="Occupation for proposals">
           <input class="input" type="number" name="limit" value="50" min="1" max="200" step="1">
           <input class="input" type="number" name="min_score" value="80" min="1" max="100" step="1">
-          <input class="input" type="number" name="max_updates" value="20" min="1" max="200" step="1">
-          <button class="btn primary" type="submit">Auto-Fix Failed Products</button>
+          <input class="input" type="number" name="max_proposals" value="20" min="1" max="200" step="1">
+          <button class="btn primary" type="submit">Generate Approval Queue</button>
+        </form>
+        <form class="actions" action="/admin/ai-team/proposals/apply-all" method="POST">
+          <input type="hidden" name="admin_token" value="{{ admin_token_hint }}">
+          <input type="hidden" name="redirect" value="1">
+          <button class="btn" type="submit">Approve And Apply All Pending</button>
+          <a class="btn" href="/admin/inventory-overrides?admin_token={{ admin_token_hint|urlencode }}" target="_blank" rel="noopener">Inventory Overrides JSON</a>
         </form>
         <div id="ai-status" class="status-line">Ready.</div>
         <pre id="ai-report" class="report">Run the AI Team to see guidance.</pre>
+      </section>
+
+      <section class="card">
+        <h2>AI Fix Approval Queue <span class="pill">{{ ai_fix_queue|length }}</span></h2>
+        <table>
+          <thead>
+            <tr><th>Product</th><th>Occupation</th><th>Prior Score</th><th>Actions</th><th>Created</th></tr>
+          </thead>
+          <tbody>
+            {% for q in ai_fix_queue %}
+            <tr>
+              <td><a href="/products/{{ q.product_id }}?v={{ q.updated_at|urlencode }}" target="_blank" rel="noopener">{{ q.title }}</a></td>
+              <td>{{ q.occupation }}</td>
+              <td>{{ q.prior_score }}</td>
+              <td>
+                <form style="display:inline" action="/admin/ai-team/proposals/{{ q.id }}/apply" method="POST">
+                  <input type="hidden" name="admin_token" value="{{ admin_token_hint }}">
+                  <input type="hidden" name="redirect" value="1">
+                  <button class="btn" type="submit">Approve</button>
+                </form>
+                <form style="display:inline" action="/admin/ai-team/proposals/{{ q.id }}/reject" method="POST">
+                  <input type="hidden" name="admin_token" value="{{ admin_token_hint }}">
+                  <input type="hidden" name="redirect" value="1">
+                  <button class="btn" type="submit">Reject</button>
+                </form>
+              </td>
+              <td>{{ q.created_at }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </section>
+
+      <section class="card">
+        <h2>Applied Inventory Overrides <span class="pill">{{ overrides|length }}</span></h2>
+        <table>
+          <thead>
+            <tr><th>Product</th><th>Category</th><th>Tagline</th><th>Updated</th></tr>
+          </thead>
+          <tbody>
+            {% for o in overrides %}
+            <tr>
+              <td><a href="/store?v={{ o.updated_at|urlencode }}" target="_blank" rel="noopener">{{ o.title }}</a></td>
+              <td>{{ o.category }}</td>
+              <td>{{ o.tagline }}</td>
+              <td>{{ o.updated_at }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
       </section>
 
       <section class="card">

@@ -208,5 +208,12 @@ Option B: Manual token:
   - `GET /admin/test-agent/all?occupation=<job title>&limit=50&admin_token=<ADMIN_TOKEN>`
 - AI Team strategic report (admin token required):
   - `GET /admin/ai-team/report?occupation=<job title>&limit=50&admin_token=<ADMIN_TOKEN>`
+- AI Team proposal queue (admin token required):
+  - `POST /admin/ai-team/proposals/generate` with `occupation`, `limit`, `min_score`, `max_proposals`, `admin_token`
+  - `GET /admin/ai-team/proposals?status=pending&admin_token=<ADMIN_TOKEN>`
+  - `POST /admin/ai-team/proposals/<proposal_id>/apply` with `admin_token`
+  - `POST /admin/ai-team/proposals/<proposal_id>/reject` with `admin_token`
+  - `POST /admin/ai-team/proposals/apply-all` with `admin_token`
+  - `GET /admin/inventory-overrides?admin_token=<ADMIN_TOKEN>`
 - AI Team auto-fix (admin token required):
   - `POST /admin/ai-team/autofix` with `occupation`, `limit`, `min_score`, `max_updates`, `admin_token`
