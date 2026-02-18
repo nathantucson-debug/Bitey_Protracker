@@ -52,9 +52,28 @@
     .bundle { background:#fff; border:1px solid var(--line); border-radius:14px; padding:1rem; box-shadow:0 12px 24px rgba(15,23,42,.05); }
     .bundle h3 { margin:0 0 .3rem; }
     .section-title { margin:1.3rem 0 .45rem; font-family:"Sora","Manrope",sans-serif; font-size:1.35rem; }
+    .mobile-only { display:none; }
     @media (max-width:700px) {
+      .nav { padding:.75rem 0; }
+      .brand-tag { display:none; }
+      .btn { padding:.56rem .78rem; font-size:.9rem; border-radius:10px; }
+      main { padding:1rem 0 1.35rem; }
+      .hero { padding:.95rem; border-radius:16px; margin-bottom:.7rem; }
       h1 { font-size:1.75rem; }
+      .sub { margin-bottom:.62rem; font-size:.95rem; line-height:1.45; }
+      .hero-meta { gap:.35rem; }
+      .meta-chip { font-size:.72rem; padding:.2rem .5rem; }
+      .chips { flex-wrap:nowrap; overflow-x:auto; padding-bottom:.2rem; margin-bottom:.72rem; scrollbar-width:thin; }
+      .chip { white-space:nowrap; padding:.3rem .55rem; }
+      .grid { grid-template-columns:1fr; gap:.75rem; }
       .card { min-height:unset; }
+      .thumb { height:180px; }
+      .title { min-height:unset; font-size:1.2rem; }
+      .tagline, .desc { min-height:unset; }
+      .row .btn { flex:1 1 100%; }
+      .micro { font-size:.81rem; }
+      .section-title { margin:1rem 0 .45rem; font-size:1.18rem; }
+      .mobile-only { display:inline-block; }
     }
   </style>
 </head>
@@ -68,7 +87,7 @@
           <div class="brand-tag">Premium Digital Systems</div>
         </div>
       </a>
-      <a class="btn" href="/">Home</a>
+      <a class="btn" href="/">Home<span class="mobile-only"> Page</span></a>
     </div>
   </header>
 
