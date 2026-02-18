@@ -5,76 +5,102 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{ product.title }} | Northstar Studio</title>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,700&display=swap');
-    :root{--ink:#111827;--muted:#4b5563;--line:#e5e7eb;--bg:#f8fafc;--brand:#1d4ed8;--ok:#15815b;--warn:#ab5c00}
-    *{box-sizing:border-box}
-    body{margin:0;font-family:"Instrument Sans",system-ui,sans-serif;color:var(--ink);background:var(--bg)}
-    .wrap{max-width:1140px;margin:0 auto;padding:0 1rem}
-    header{position:sticky;top:0;background:#ffffffed;backdrop-filter:blur(8px);border-bottom:1px solid var(--line);z-index:20}
-    .nav{display:flex;justify-content:space-between;align-items:center;padding:.82rem 0}
-    .brand{display:flex;gap:.6rem;align-items:center;text-decoration:none;color:inherit}
-    .brand img{width:34px;height:34px;border-radius:10px}
-    .brand h2{margin:0;font:700 1.1rem "Fraunces",serif}
-    .brand p{margin:0;color:#64748b;font-size:.78rem}
-    .btn{display:inline-block;text-decoration:none;border:1px solid var(--line);background:#fff;color:var(--ink);padding:.58rem .85rem;border-radius:10px;font-weight:600}
-    .btn.primary{background:var(--brand);border-color:var(--brand);color:#fff}
+    @import url('https://fonts.googleapis.com/css2?family=General+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap');
+    :root {
+      --ink:#111827;
+      --muted:#4b5563;
+      --line:#e5e7eb;
+      --bg:#f7f7f5;
+      --card:#fff;
+      --brand:#1d4ed8;
+      --ok:#15815b;
+      --warn:#ab5c00;
+      --brand-soft:#e8efff;
+    }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:"General Sans","Avenir Next","Segoe UI",sans-serif; color:var(--ink); background:var(--bg); }
+    .wrap { max-width:1180px; margin:0 auto; padding:0 1rem; }
 
-    main{padding:1rem 0 1.9rem}
-    .status{margin-bottom:.65rem;padding:.58rem .68rem;border:1px solid var(--line);background:#fff;border-radius:10px;font-size:.9rem;font-weight:600}
-    .status.ok{color:var(--ok);border-color:#bce7d3;background:#f1fcf6}
-    .status.warn{color:var(--warn);border-color:#f0d4ba;background:#fff8f1}
+    header { position:sticky; top:0; z-index:30; background:rgba(247,247,245,.92); backdrop-filter:blur(8px); border-bottom:1px solid var(--line); }
+    .nav { display:flex; justify-content:space-between; align-items:center; gap:1rem; padding:.85rem 0; }
+    .brand { display:flex; align-items:center; gap:.62rem; text-decoration:none; color:inherit; }
+    .brand img { width:36px; height:36px; border-radius:9px; }
+    .brand h2 { margin:0; font-size:1.1rem; }
+    .brand p { margin:0; font-size:.78rem; color:#64748b; }
 
-    .layout{display:grid;grid-template-columns:1.2fr .8fr;gap:.9rem;align-items:start}
-    .card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:.88rem}
-    .cat{display:inline-block;font-size:.72rem;color:#1e3a8a;border:1px solid #dbe4f4;background:#eff5ff;padding:.2rem .5rem;border-radius:999px;margin-bottom:.42rem}
-    h1{margin:0 0 .38rem;font:700 clamp(1.85rem,3.7vw,2.7rem) "Fraunces",serif;line-height:1.04}
-    .tagline{margin:0 0 .38rem;font-weight:600;color:#1f2937}
-    .desc{margin:0 0 .62rem;color:var(--muted);line-height:1.56}
-    .price{margin:0 0 .7rem;font:700 1.95rem "Fraunces",serif}
-    .buyer-note{margin:0 0 .82rem;border:1px solid #dbe4f4;background:#f8fafc;border-radius:10px;padding:.58rem .68rem;font-size:.9rem;color:#334155}
+    .btn { display:inline-block; text-decoration:none; border:1px solid var(--line); color:var(--ink); background:#fff; padding:.56rem .84rem; border-radius:10px; font-weight:600; }
+    .btn.primary { background:var(--brand); border-color:var(--brand); color:#fff; }
 
-    h3{margin:.88rem 0 .4rem;font:700 1.15rem "Fraunces",serif}
-    .artifact{border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;background:#fff}
-    .artifact-head{padding:.68rem .78rem;border-bottom:1px solid #e5e7eb;background:#f8fafc}
-    .artifact-head h4{margin:0 0 .2rem;font-size:1rem}
-    .artifact-head p{margin:0;color:#64748b;font-size:.9rem}
-    .artifact table{width:100%;border-collapse:collapse;font-size:.88rem}
-    .artifact th,.artifact td{border-bottom:1px solid #eef2f7;padding:.45rem .5rem;text-align:left;vertical-align:top}
-    .artifact th{background:#fff;color:#334155}
-    .artifact-result{padding:.58rem .78rem;background:#f8fafc;color:#334155;font-weight:600}
+    main { padding:1rem 0 1.9rem; }
+    .status { margin-bottom:.65rem; padding:.56rem .68rem; border-radius:10px; border:1px solid var(--line); background:#fff; font-size:.9rem; font-weight:600; }
+    .status.ok { color:var(--ok); border-color:#bfe8d5; background:#f1fcf6; }
+    .status.warn { color:var(--warn); border-color:#efd4bb; background:#fff8f1; }
 
-    .list{margin:0;padding-left:1rem;color:#374151}
-    .list li{margin:.25rem 0}
-    .preview{border:1px solid #e5e7eb;background:#f8fafc;border-radius:10px;padding:.72rem;color:#374151;line-height:1.52}
+    .layout { display:grid; grid-template-columns:1.2fr .8fr; gap:1rem; align-items:start; }
+    .card { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:.9rem; }
 
-    .side{position:sticky;top:76px}
-    .small{color:#4b5563;font-size:.9rem;line-height:1.45}
-    label{display:block;margin:.45rem 0 .2rem;font-size:.84rem;font-weight:600;color:#334155}
-    input[type="email"]{width:100%;border:1px solid var(--line);border-radius:10px;padding:.6rem .68rem;font-size:.95rem}
-    .inline{display:flex;align-items:flex-start;gap:.42rem;margin:.5rem 0;color:#374151}
-    .trust{margin-top:.65rem;border:1px solid #dbe4f4;background:#f8fafc;border-radius:10px;padding:.58rem .68rem;font-size:.86rem;color:#334155}
+    .cat { display:inline-block; font-size:.72rem; color:#1e3a8a; background:var(--brand-soft); border:1px solid #dbe5fb; border-radius:999px; padding:.18rem .5rem; margin-bottom:.4rem; }
+    h1 { margin:0 0 .35rem; font:700 clamp(1.95rem,3.9vw,2.8rem) "Playfair Display",serif; line-height:1.04; letter-spacing:-.02em; }
+    .tagline { margin:0 0 .4rem; font-weight:600; color:#1f2937; }
+    .desc { margin:0 0 .62rem; color:var(--muted); line-height:1.6; }
+    .price { margin:0 0 .7rem; font:700 2rem "Playfair Display",serif; }
+    .buyer-note { margin:0 0 .85rem; border:1px solid #dbe5fb; background:#f8faff; border-radius:10px; padding:.58rem .68rem; color:#334155; font-size:.9rem; }
 
-    .mobile-buybar{display:none}
-    .mobile-buybar-spacer{display:none}
+    h3 { margin:.92rem 0 .42rem; font:700 1.15rem "Playfair Display",serif; }
+    .artifact { border:1px solid var(--line); border-radius:12px; overflow:hidden; background:#fff; }
+    .artifact-head { padding:.66rem .74rem; border-bottom:1px solid var(--line); background:#fafafa; }
+    .artifact-head h4 { margin:0 0 .2rem; font-size:1rem; }
+    .artifact-head p { margin:0; color:#64748b; font-size:.88rem; }
+    .artifact table { width:100%; border-collapse:collapse; font-size:.86rem; }
+    .artifact th, .artifact td { border-bottom:1px solid #edf1f6; padding:.44rem .5rem; text-align:left; vertical-align:top; }
+    .artifact th { background:#fff; color:#334155; }
+    .artifact-result { padding:.55rem .74rem; background:#fafafa; color:#374151; font-weight:600; }
 
-    @media (max-width:900px){.layout{grid-template-columns:1fr}.side{position:static}}
-    @media (max-width:700px){
-      .brand p{display:none}
-      .card{padding:.78rem}
-      h1{font-size:1.95rem}
-      .artifact th,.artifact td{font-size:.8rem;padding:.38rem .42rem}
-      .mobile-buybar-spacer{display:block;height:80px}
-      .mobile-buybar{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:40;align-items:center;justify-content:space-between;gap:.5rem;padding:.56rem .68rem calc(.56rem + env(safe-area-inset-bottom));background:#fff;border-top:1px solid var(--line);box-shadow:0 -10px 22px rgba(15,23,42,.1)}
-      .mobile-buybar .mini{font:700 1.06rem "Fraunces",serif}
-      .mobile-buybar .mini span{display:block;font:600 .73rem "Instrument Sans",sans-serif;color:#64748b}
-      .mobile-buybar .btn{flex:1;text-align:center}
+    .list { margin:0; padding-left:1rem; color:#374151; }
+    .list li { margin:.24rem 0; }
+    .preview { border:1px solid var(--line); background:#fafafa; border-radius:10px; padding:.7rem; color:#374151; line-height:1.52; }
+
+    .side { position:sticky; top:76px; }
+    .small { color:var(--muted); font-size:.9rem; line-height:1.45; }
+    label { display:block; margin:.42rem 0 .2rem; font-size:.84rem; font-weight:600; color:#334155; }
+    input[type="email"] { width:100%; border:1px solid var(--line); border-radius:10px; padding:.58rem .66rem; font-size:.94rem; }
+    .inline { display:flex; align-items:flex-start; gap:.4rem; margin:.48rem 0; color:#374151; }
+    .trust { margin-top:.65rem; border:1px solid #dbe5fb; background:#f8faff; border-radius:10px; padding:.56rem .66rem; color:#334155; font-size:.86rem; }
+
+    .mobile-buybar { display:none; }
+    .mobile-buybar-spacer { display:none; }
+
+    @media (max-width:900px) {
+      .layout { grid-template-columns:1fr; }
+      .side { position:static; }
+    }
+    @media (max-width:700px) {
+      .brand p { display:none; }
+      h1 { font-size:2rem; }
+      .artifact th, .artifact td { font-size:.78rem; padding:.36rem .42rem; }
+      .mobile-buybar-spacer { display:block; height:80px; }
+      .mobile-buybar {
+        display:flex; position:fixed; left:0; right:0; bottom:0; z-index:40;
+        align-items:center; justify-content:space-between; gap:.5rem;
+        padding:.54rem .66rem calc(.54rem + env(safe-area-inset-bottom));
+        background:#fff; border-top:1px solid var(--line); box-shadow:0 -10px 22px rgba(15,23,42,.1);
+      }
+      .mobile-buybar .mini { font:700 1.06rem "Playfair Display",serif; }
+      .mobile-buybar .mini span { display:block; font:600 .73rem "General Sans",sans-serif; color:#64748b; }
+      .mobile-buybar .btn { flex:1; text-align:center; }
     }
   </style>
 </head>
 <body>
   <header>
     <div class="wrap nav">
-      <a class="brand" href="/"><img src="/static/brand/northstar-mark.svg" alt="Northstar Studio"><div><h2>Northstar Studio</h2><p>Practical digital products</p></div></a>
+      <a class="brand" href="/">
+        <img src="/static/brand/northstar-mark.svg" alt="Northstar Studio">
+        <div>
+          <h2>Northstar Studio</h2>
+          <p>Premium Digital Systems</p>
+        </div>
+      </a>
       <a class="btn" href="/store">Back to store</a>
     </div>
   </header>

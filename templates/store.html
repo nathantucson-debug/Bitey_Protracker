@@ -5,69 +5,114 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Northstar Studio Store</title>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,700&display=swap');
-    :root{--ink:#111827;--muted:#4b5563;--line:#e5e7eb;--bg:#f8fafc;--card:#fff;--brand:#1d4ed8;--brand2:#0f172a}
-    *{box-sizing:border-box}
-    body{margin:0;font-family:"Instrument Sans",system-ui,sans-serif;color:var(--ink);background:var(--bg)}
-    .wrap{max-width:1160px;margin:0 auto;padding:0 1rem}
-    header{position:sticky;top:0;background:#ffffffed;backdrop-filter:blur(8px);border-bottom:1px solid var(--line);z-index:20}
-    .nav{display:flex;justify-content:space-between;align-items:center;padding:.85rem 0}
-    .brand{display:flex;gap:.6rem;align-items:center;text-decoration:none;color:inherit}
-    .brand img{width:34px;height:34px;border-radius:10px}
-    .brand h2{margin:0;font:700 1.1rem "Fraunces",serif;letter-spacing:-.01em}
-    .brand p{margin:0;color:#64748b;font-size:.78rem}
-    .btn{display:inline-block;text-decoration:none;border:1px solid var(--line);background:#fff;color:var(--ink);padding:.55rem .85rem;border-radius:10px;font-weight:600}
-    .btn.primary{background:var(--brand);border-color:var(--brand);color:#fff}
+    @import url('https://fonts.googleapis.com/css2?family=General+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap');
+    :root {
+      --ink:#111827;
+      --muted:#4b5563;
+      --line:#e5e7eb;
+      --bg:#f7f7f5;
+      --card:#ffffff;
+      --brand:#1d4ed8;
+      --brand-soft:#e8efff;
+      --warm:#fff8ef;
+    }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:"General Sans","Avenir Next","Segoe UI",sans-serif; color:var(--ink); background:var(--bg); }
+    .wrap { max-width:1220px; margin:0 auto; padding:0 1rem; }
 
-    main{padding:1.2rem 0 1.9rem}
-    .hero{background:#fff;border:1px solid var(--line);border-radius:18px;padding:1rem 1.05rem;margin-bottom:.9rem}
-    h1{margin:0 0 .45rem;font:700 clamp(1.8rem,3.9vw,2.8rem) "Fraunces",serif;line-height:1.05}
-    .sub{margin:0;color:var(--muted);line-height:1.55;max-width:68ch}
-    .hero-row{margin-top:.75rem;display:flex;gap:.45rem;flex-wrap:wrap}
-    .meta{font-size:.78rem;color:#334155;border:1px solid #dbe3ef;background:#f8fafc;border-radius:999px;padding:.2rem .55rem}
+    header { position:sticky; top:0; z-index:40; background:rgba(247,247,245,.92); backdrop-filter:blur(8px); border-bottom:1px solid var(--line); }
+    .topbar { text-align:center; font-size:.78rem; color:#334155; padding:.4rem .7rem; border-bottom:1px solid var(--line); background:#fff; }
+    .nav { display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:.9rem 0; }
+    .brand { display:flex; align-items:center; gap:.62rem; text-decoration:none; color:inherit; }
+    .brand img { width:36px; height:36px; border-radius:9px; }
+    .brand h2 { margin:0; font-size:1.1rem; letter-spacing:-.01em; }
+    .brand p { margin:0; font-size:.78rem; color:#64748b; }
+    .btn { display:inline-block; text-decoration:none; border:1px solid var(--line); color:var(--ink); background:#fff; padding:.56rem .84rem; border-radius:10px; font-weight:600; }
+    .btn.primary { background:var(--brand); border-color:var(--brand); color:#fff; }
 
-    .chips{display:flex;gap:.42rem;flex-wrap:wrap;margin:.95rem 0}
-    .chip{text-decoration:none;color:#1e3a8a;border:1px solid #dbe4f4;background:#eff5ff;padding:.24rem .58rem;border-radius:999px;font-size:.8rem;font-weight:600}
-    .chip.active{background:#1d4ed8;border-color:#1d4ed8;color:#fff}
+    main { padding:1.2rem 0 2rem; }
 
-    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(265px,1fr));gap:.9rem}
-    .card{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;display:flex;flex-direction:column}
-    .sample{padding:.72rem;border-bottom:1px solid var(--line);background:#f8fafc}
-    .sample h4{margin:0 0 .35rem;font-size:.83rem;color:#334155}
-    .sample table{width:100%;border-collapse:collapse;font-size:.76rem}
-    .sample th,.sample td{border:1px solid #e5e7eb;padding:.22rem .3rem;text-align:left;vertical-align:top}
-    .sample th{background:#fff;color:#334155}
-    .body{padding:.78rem .82rem .88rem;display:flex;flex-direction:column;gap:.38rem;flex:1}
-    .cat{align-self:flex-start;font-size:.72rem;color:#1e3a8a;border:1px solid #dbe4f4;background:#eff5ff;padding:.2rem .5rem;border-radius:999px}
-    .title{margin:0;font:700 1.2rem "Fraunces",serif;line-height:1.1}
-    .tag{margin:0;font-weight:600;color:#1f2937}
-    .desc{margin:0;color:var(--muted);line-height:1.45;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden}
-    .price{margin-top:auto;font:700 1.36rem "Fraunces",serif}
-    .row{display:flex;gap:.4rem}
-    .row .btn{flex:1;text-align:center}
+    .hero {
+      display:grid; grid-template-columns:1.15fr .85fr; gap:1rem;
+      background:var(--card); border:1px solid var(--line); border-radius:20px; padding:1rem;
+      margin-bottom:1rem;
+    }
+    .hero h1 {
+      margin:0 0 .45rem;
+      font:700 clamp(2rem,4vw,3rem) "Playfair Display",serif;
+      line-height:1.04; letter-spacing:-.02em;
+    }
+    .hero p { margin:0; color:var(--muted); line-height:1.6; max-width:64ch; }
+    .hero-points { margin:.7rem 0 0; padding-left:1rem; color:#334155; }
+    .hero-points li { margin:.3rem 0; }
 
-    .section-title{margin:1.1rem 0 .45rem;font:700 1.25rem "Fraunces",serif}
-    .bundles{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:.8rem}
-    .bundle{background:#fff;border:1px solid var(--line);border-radius:14px;padding:.85rem}
-    .bundle h3{margin:0 0 .3rem;font:700 1.08rem "Fraunces",serif}
-    .bundle p{margin:0 0 .55rem;color:var(--muted)}
+    .trust {
+      border:1px solid var(--line); border-radius:14px; background:var(--warm); padding:.8rem;
+      display:grid; gap:.5rem; align-content:start;
+    }
+    .trust h3 { margin:0; font-size:1rem; }
+    .trust .kpi { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.45rem; }
+    .metric { border:1px solid #efe2cd; background:#fff; border-radius:10px; padding:.55rem; }
+    .metric strong { display:block; font-size:1.15rem; }
+    .metric span { font-size:.78rem; color:#6b7280; }
 
-    @media (max-width:700px){
-      .brand p{display:none}
-      .chips{flex-wrap:nowrap;overflow-x:auto;padding-bottom:.2rem;scrollbar-width:thin}
-      .chip{white-space:nowrap}
-      .grid{grid-template-columns:1fr}
-      .row{flex-direction:column}
-      .row .btn{width:100%}
+    .filters { display:flex; gap:.42rem; flex-wrap:wrap; margin:.9rem 0; }
+    .chip { text-decoration:none; font-size:.8rem; font-weight:600; color:#1e3a8a; border:1px solid #dbe5fb; background:#eff4ff; border-radius:999px; padding:.25rem .58rem; white-space:nowrap; }
+    .chip.active { background:#1d4ed8; border-color:#1d4ed8; color:#fff; }
+
+    .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(275px,1fr)); gap:1rem; }
+    .card { background:var(--card); border:1px solid var(--line); border-radius:16px; overflow:hidden; display:flex; flex-direction:column; }
+
+    .card-head { padding:.72rem .76rem; border-bottom:1px solid var(--line); background:#fafafa; }
+    .badge { display:inline-block; font-size:.72rem; color:#1e3a8a; background:var(--brand-soft); border:1px solid #dbe5fb; border-radius:999px; padding:.18rem .5rem; margin-bottom:.45rem; }
+    .title { margin:0; font:700 1.25rem "Playfair Display",serif; line-height:1.12; }
+    .tagline { margin:.28rem 0 0; color:#374151; font-weight:600; font-size:.96rem; }
+
+    .artifact { padding:.72rem .76rem; border-bottom:1px solid var(--line); background:#fff; }
+    .artifact h4 { margin:0 0 .35rem; font-size:.82rem; color:#374151; }
+    .artifact table { width:100%; border-collapse:collapse; font-size:.75rem; }
+    .artifact th, .artifact td { border:1px solid #eceff5; padding:.22rem .28rem; text-align:left; vertical-align:top; }
+    .artifact th { background:#f9fafb; color:#334155; }
+
+    .body { padding:.75rem .76rem .85rem; display:flex; flex-direction:column; gap:.45rem; flex:1; }
+    .desc { margin:0; color:var(--muted); line-height:1.5; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+    .inc { margin:0; padding-left:1rem; color:#374151; font-size:.88rem; }
+    .inc li { margin:.2rem 0; }
+    .price-row { display:flex; align-items:baseline; justify-content:space-between; margin-top:auto; }
+    .price { font:700 1.45rem "Playfair Display",serif; }
+    .label { font-size:.74rem; color:#64748b; font-weight:600; }
+    .actions { display:flex; gap:.42rem; }
+    .actions .btn { flex:1; text-align:center; }
+
+    .section-title { margin:1.2rem 0 .45rem; font:700 1.25rem "Playfair Display",serif; }
+    .bundles { display:grid; grid-template-columns:repeat(auto-fit,minmax(270px,1fr)); gap:.85rem; }
+    .bundle { background:#fff; border:1px solid var(--line); border-radius:14px; padding:.85rem; }
+    .bundle h3 { margin:0 0 .35rem; font:700 1.06rem "Playfair Display",serif; }
+    .bundle p { margin:0 0 .58rem; color:var(--muted); }
+
+    @media (max-width:860px) {
+      .hero { grid-template-columns:1fr; }
+    }
+    @media (max-width:700px) {
+      .brand p { display:none; }
+      .topbar { font-size:.72rem; }
+      .filters { flex-wrap:nowrap; overflow-x:auto; padding-bottom:.2rem; scrollbar-width:thin; }
+      .grid { grid-template-columns:1fr; }
+      .actions { flex-direction:column; }
+      .actions .btn { width:100%; }
     }
   </style>
 </head>
 <body>
   <header>
+    <div class="topbar">Practical digital products with completed examples and guided implementation.</div>
     <div class="wrap nav">
       <a class="brand" href="/">
         <img src="/static/brand/northstar-mark.svg" alt="Northstar Studio">
-        <div><h2>Northstar Studio</h2><p>Practical digital products</p></div>
+        <div>
+          <h2>Northstar Studio</h2>
+          <p>Premium Digital Systems</p>
+        </div>
       </a>
       <a class="btn" href="/">Home</a>
     </div>
@@ -75,16 +120,27 @@
 
   <main class="wrap">
     <section class="hero">
-      <h1>Clear digital products with real working examples</h1>
-      <p class="sub">Preview each product before you buy. Every product includes editable files, completed examples, and a guided path to first result.</p>
-      <div class="hero-row">
-        <span class="meta">Preview before purchase</span>
-        <span class="meta">Instant download</span>
-        <span class="meta">7-day satisfaction guarantee</span>
+      <div>
+        <h1>Buy digital products you can actually use today</h1>
+        <p>Each product includes practical templates, completed examples, and a clear setup path so buyers can get a first result quickly.</p>
+        <ul class="hero-points">
+          <li>Preview real sample output before purchase</li>
+          <li>Instant delivery after checkout</li>
+          <li>7-day satisfaction guarantee with one-time store credit</li>
+        </ul>
       </div>
+      <aside class="trust">
+        <h3>Buyer standards</h3>
+        <div class="kpi">
+          <div class="metric"><strong>50</strong><span>Store products</span></div>
+          <div class="metric"><strong>3+</strong><span>Core deliverables each</span></div>
+          <div class="metric"><strong>1</strong><span>Guided flow included</span></div>
+          <div class="metric"><strong>24/7</strong><span>Instant access</span></div>
+        </div>
+      </aside>
     </section>
 
-    <div class="chips">
+    <div class="filters">
       <a class="chip {% if not selected_category %}active{% endif %}" href="/store">All</a>
       {% for c in categories %}
       <a class="chip {% if selected_category == c %}active{% endif %}" href="/store?category={{ c|urlencode }}">{{ c }}</a>
@@ -94,30 +150,35 @@
     <section class="grid">
       {% for p in products %}
       <article class="card">
-        <div class="sample">
+        <div class="card-head">
+          <span class="badge">{{ p.category }}</span>
+          <h2 class="title">{{ p.title }}</h2>
+          <p class="tagline">{{ p.tagline }}</p>
+        </div>
+
+        <div class="artifact">
           <h4>{{ p.real_world_preview.headline }}</h4>
           <table>
-            <thead>
-              <tr>
-                {% for c in p.real_world_preview.columns[:3] %}<th>{{ c }}</th>{% endfor %}
-              </tr>
-            </thead>
+            <thead><tr>{% for c in p.real_world_preview.columns[:3] %}<th>{{ c }}</th>{% endfor %}</tr></thead>
             <tbody>
               {% if p.real_world_preview.rows and p.real_world_preview.rows|length > 0 %}
-              <tr>
-                {% for cell in p.real_world_preview.rows[0][:3] %}<td>{{ cell }}</td>{% endfor %}
-              </tr>
+              <tr>{% for cell in p.real_world_preview.rows[0][:3] %}<td>{{ cell }}</td>{% endfor %}</tr>
               {% endif %}
             </tbody>
           </table>
         </div>
+
         <div class="body">
-          <span class="cat">{{ p.category }}</span>
-          <h2 class="title">{{ p.title }}</h2>
-          <p class="tag">{{ p.tagline }}</p>
           <p class="desc">{{ p.description }}</p>
-          <strong class="price">${{ "%.2f"|format(p.price_cents / 100) }}</strong>
-          <div class="row">
+          <ul class="inc">
+            <li>{{ p.preview_items[0] if p.preview_items|length > 0 else "Guided setup" }}</li>
+            <li>{{ p.preview_items[1] if p.preview_items|length > 1 else "Editable core file" }}</li>
+          </ul>
+          <div class="price-row">
+            <strong class="price">${{ "%.2f"|format(p.price_cents / 100) }}</strong>
+            <span class="label">Instant download</span>
+          </div>
+          <div class="actions">
             <a class="btn primary" href="/products/{{ p.id }}">Preview</a>
             <a class="btn" href="/checkout/{{ p.id }}">Buy</a>
           </div>
