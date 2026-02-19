@@ -252,8 +252,25 @@ def _read_wav_mono(file_bytes: bytes) -> tuple[list[float], int]:
                 frame = raw[i : i + channels]
                 avg = (sum(frame) / len(frame) - 128.0) / 128.0
                 mono.append(max(-1.0, min(1.0, avg)))
+    elif sample_width == 3:
+        frame_width = channels * 3
+        mono = []
+        for i in range(0, len(raw), frame_width):
+            frame = raw[i : i + frame_width]
+            if len(frame) < frame_width:
+                break
+            vals = []
+            for ch in range(channels):
+                b0 = frame[ch * 3]
+                b1 = frame[ch * 3 + 1]
+                b2 = frame[ch * 3 + 2]
+                value = b0 | (b1 << 8) | (b2 << 16)
+                if value & 0x800000:
+                    value -= 0x1000000
+                vals.append(value / 8388608.0)
+            mono.append(max(-1.0, min(1.0, sum(vals) / len(vals))))
     else:
-        raise ValueError("Only 8-bit and 16-bit PCM WAV files are supported")
+        raise ValueError("Only 8-bit, 16-bit, or 24-bit PCM WAV files are supported")
 
     if not mono:
         raise ValueError("WAV file has no audio samples")
@@ -511,7 +528,7 @@ def _add_kick(buffer: list[float], start_sample: int, sample_rate: int, amp: flo
 def _build_atari_remix_from_wav(file_bytes: bytes, source_name: str) -> dict:
     src_samples, src_rate = _read_wav_mono(file_bytes)
     duration_seconds = max(1, int(round(len(src_samples) / src_rate)))
-    duration_seconds = max(10, min(240, duration_seconds))
+    duration_seconds = max(10, min(180, duration_seconds))
 
     analysis_rate = 11025
     analysis_samples = _resample_linear(src_samples, src_rate, analysis_rate)
@@ -526,15 +543,18 @@ def _build_atari_remix_from_wav(file_bytes: bytes, source_name: str) -> dict:
     source_id = hashlib.sha256(file_bytes).hexdigest()[:16]
     rng = random.Random(int(hashlib.sha256((source_id + key_name).encode("utf-8")).hexdigest()[:12], 16))
 
-    if duration_seconds >= 180:
-        sample_rate = 8000
-        long_mode = True
+    if duration_seconds >= 150:
+        sample_rate = 4000
+        mode_level = 2
     elif duration_seconds >= 120:
-        sample_rate = 10000
-        long_mode = True
+        sample_rate = 5000
+        mode_level = 1
+    elif duration_seconds >= 90:
+        sample_rate = 7000
+        mode_level = 1
     else:
         sample_rate = 12000
-        long_mode = False
+        mode_level = 0
     total_samples = duration_seconds * sample_rate
     step_starts = _build_step_starts(total_samples, sample_rate, tempo_map_bpm)
     progression_minor = [0, 3, 7, 10, 7, 5, 3, 0]
@@ -548,7 +568,7 @@ def _build_atari_remix_from_wav(file_bytes: bytes, source_name: str) -> dict:
         bar_idx = step_idx // 16
         dyn = _sample_envelope(envelope, start * analysis_rate // max(1, sample_rate), len(analysis_samples))
         chord_root = root_note + progression[(bar_idx // 2) % len(progression)]
-        density_gate = 0.75 if long_mode else 1.0
+        density_gate = 0.55 if mode_level >= 2 else (0.72 if mode_level >= 1 else 1.0)
 
         if step_in_bar in (0, 8) or (dyn > 0.55 and step_in_bar == 12 and rng.random() < 0.3):
             _add_kick(stems_float["kick"], start, sample_rate, 0.48 + dyn * 0.5)
@@ -556,26 +576,26 @@ def _build_atari_remix_from_wav(file_bytes: bytes, source_name: str) -> dict:
             _add_noise_hit(stems_float["snare"], start, int(sample_rate * 0.16), 0.35 + dyn * 0.33, rng, decay=5.2)
             _add_tone(stems_float["snare"], start, int(sample_rate * 0.1), sample_rate, 190.0, 0.12, "triangle", rng)
 
-        if step_in_bar % 2 == 0 and dyn > 0.12 and (not long_mode or step_in_bar % 4 == 0):
+        if step_in_bar % 2 == 0 and dyn > 0.12 and (mode_level == 0 or step_in_bar % 4 == 0):
             _add_noise_hit(stems_float["hat"], start, int(sample_rate * 0.045), 0.13 + dyn * 0.2, rng, decay=7.5)
 
         if step_in_bar in (0, 3, 8, 11) and dyn > 0.1:
             bass_note = chord_root - 12 + (0 if step_in_bar in (0, 8) else 7)
             _add_tone(stems_float["bass"], start, int(sample_rate * 0.16), sample_rate, _midi_to_hz(bass_note), 0.22 + dyn * 0.24, "square", rng)
 
-        if step_in_bar % 2 == 0 and dyn > 0.22 and rng.random() <= density_gate:
+        if mode_level <= 1 and step_in_bar % 2 == 0 and dyn > 0.22 and rng.random() <= density_gate:
             arp_offsets = [0, 7, 12, 7]
             arp_note = chord_root + arp_offsets[(step_in_bar // 2) % len(arp_offsets)] + 12
             _add_tone(stems_float["arp"], start, int(sample_rate * 0.11), sample_rate, _midi_to_hz(arp_note), 0.08 + dyn * 0.14, "square", rng)
 
-        if step_in_bar in (0, 8) and dyn > 0.28 and rng.random() <= density_gate:
+        if mode_level <= 1 and step_in_bar in (0, 8) and dyn > 0.28 and rng.random() <= density_gate:
             for n in (0, 3 if "minor" in key_name else 4, 7):
-                _add_tone(stems_float["chord"], start, int(sample_rate * (0.36 if long_mode else 0.62)), sample_rate, _midi_to_hz(chord_root + n + 12), 0.05 + dyn * 0.08, "triangle", rng)
+                _add_tone(stems_float["chord"], start, int(sample_rate * (0.36 if mode_level >= 1 else 0.62)), sample_rate, _midi_to_hz(chord_root + n + 12), 0.05 + dyn * 0.08, "triangle", rng)
 
-        if step_in_bar in (2, 6, 10, 14) and dyn > 0.34 and rng.random() <= density_gate:
+        if mode_level == 0 and step_in_bar in (2, 6, 10, 14) and dyn > 0.34 and rng.random() <= density_gate:
             melody_offsets = [12, 10, 7, 14, 15, 12, 19, 17]
             note = chord_root + melody_offsets[(bar_idx + step_in_bar) % len(melody_offsets)]
-            _add_tone(stems_float["lead"], start, int(sample_rate * (0.14 if long_mode else 0.2)), sample_rate, _midi_to_hz(note), 0.08 + dyn * 0.14, "saw", rng)
+            _add_tone(stems_float["lead"], start, int(sample_rate * 0.2), sample_rate, _midi_to_hz(note), 0.08 + dyn * 0.14, "saw", rng)
 
         if step_in_bar == 15 and dyn > 0.42:
             _add_noise_hit(stems_float["fx"], start, int(sample_rate * 0.2), 0.12 + dyn * 0.13, rng, decay=2.4)
