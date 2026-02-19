@@ -268,6 +268,14 @@
       return `${String(m).padStart(2, "0")}:${String(rem).padStart(2, "0")}`;
     }
 
+    async function looksLikeWav(file) {
+      const buf = await file.slice(0, 12).arrayBuffer();
+      const sig = new Uint8Array(buf);
+      const ascii = (arr) => String.fromCharCode(...arr);
+      if (sig.length < 12) return false;
+      return ascii(sig.slice(0, 4)) === "RIFF" && ascii(sig.slice(8, 12)) === "WAVE";
+    }
+
     function currentTimePosition() {
       if (!state.isPlaying || !state.context) return state.offset;
       return Math.min(state.duration, state.offset + (state.context.currentTime - state.startedAt));
@@ -432,6 +440,10 @@
         setStatus("Only WAV files are supported.", "error");
         return;
       }
+      if (!(await looksLikeWav(file))) {
+        setStatus("This file is not a true WAV (RIFF/WAVE). Convert the source to PCM WAV first.", "error");
+        return;
+      }
 
       el.build.disabled = true;
       el.download.disabled = true;
@@ -451,7 +463,14 @@
           method: "POST",
           body: form,
         });
-        const data = await res.json();
+        let data = {};
+        try {
+          data = await res.json();
+        } catch (_) {
+          if (!res.ok) {
+            throw new Error(`Session build failed (${res.status}). Try a shorter PCM WAV file.`);
+          }
+        }
         if (!res.ok) throw new Error(data.error || "Session build failed");
 
         state.sessionId = data.session_id;
