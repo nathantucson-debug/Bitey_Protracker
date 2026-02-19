@@ -361,7 +361,7 @@
         <div class="btnrow">
           <button id="build" class="primary" type="button">Build Session</button>
           <button id="download" class="warn" type="button" disabled>Export ZIP</button>
-          <a class="btn" href="/" target="_blank" rel="noopener">Home</a>
+          <button id="reset-ui" type="button">Reset</button>
         </div>
 
         <div id="status" class="status">Ready.</div>
@@ -396,7 +396,7 @@
     </section>
 
     <div class="note">
-      BITEY PROTRACKER: WAV INPUT, SOURCE-DRIVEN LOFI RENDER, STEM MIXER + TRACKER VIEW.
+      BITEY PROTRACKER: STANDALONE TRACKER WORKSPACE.
     </div>
   </main>
 
@@ -426,6 +426,7 @@
       masterGain: document.getElementById("master-gain"),
       build: document.getElementById("build"),
       download: document.getElementById("download"),
+      resetUi: document.getElementById("reset-ui"),
       status: document.getElementById("status"),
       timeReadout: document.getElementById("time-readout"),
       channels: document.getElementById("channels"),
@@ -848,6 +849,12 @@
 
     el.build.addEventListener("click", buildSession);
     el.download.addEventListener("click", downloadSessionZip);
+    el.resetUi.addEventListener("click", () => {
+      pausePlayback();
+      state.offset = 0;
+      updateTimeReadout();
+      setStatus("Reset.");
+    });
 
     buildChannelUi();
     initPatternRoll();
