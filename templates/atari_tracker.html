@@ -3,18 +3,19 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Atari 8-Track Spotify Remixer</title>
+  <title>Atari 8-Track ProTracker Mixer</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=IBM+Plex+Mono:wght@400;500;700&display=swap');
     :root {
-      --bg: #121417;
-      --panel: #1b1f26;
-      --line: #3a4558;
-      --ink: #e8f0ff;
-      --muted: #94a3bc;
-      --accent: #52f7c4;
-      --accent-2: #ffda5f;
-      --danger: #ff7d7d;
+      --bg: #101218;
+      --panel: #171c27;
+      --line: #38445a;
+      --ink: #eaf1ff;
+      --muted: #9aa9c7;
+      --accent: #5bf5c9;
+      --accent2: #ffd967;
+      --danger: #ff8484;
+      --ok: #7af58a;
     }
     * { box-sizing: border-box; }
     body {
@@ -22,124 +23,139 @@
       color: var(--ink);
       font-family: "IBM Plex Mono", monospace;
       background:
-        radial-gradient(1100px 420px at 8% -15%, rgba(82, 247, 196, 0.16), transparent 54%),
-        radial-gradient(900px 360px at 100% -10%, rgba(255, 218, 95, 0.12), transparent 57%),
-        linear-gradient(180deg, #101215 0%, #151922 100%);
+        radial-gradient(900px 380px at 10% -8%, rgba(91,245,201,.16), transparent 60%),
+        radial-gradient(900px 380px at 98% -18%, rgba(255,217,103,.12), transparent 60%),
+        linear-gradient(180deg, #0c0f14 0%, #121822 100%);
       min-height: 100vh;
     }
     .scan {
-      pointer-events: none;
       position: fixed;
       inset: 0;
-      background: repeating-linear-gradient(to bottom, rgba(255,255,255,0.02) 0, rgba(255,255,255,0.02) 1px, transparent 3px, transparent 5px);
-      opacity: .18;
+      pointer-events: none;
+      background: repeating-linear-gradient(to bottom, rgba(255,255,255,.025) 0, rgba(255,255,255,.025) 1px, transparent 3px, transparent 5px);
+      opacity: .22;
       mix-blend-mode: soft-light;
     }
-    main { max-width: 980px; margin: 0 auto; padding: 1.3rem 1rem 2rem; }
+    main { max-width: 1180px; margin: 0 auto; padding: 1.1rem .9rem 1.8rem; }
     .frame {
-      background: linear-gradient(165deg, rgba(27,31,38,.96) 0%, rgba(20,24,30,.96) 100%);
       border: 1px solid var(--line);
-      border-radius: 16px;
-      box-shadow: 0 14px 40px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.04);
+      border-radius: 14px;
+      background: linear-gradient(180deg, rgba(23,28,39,.95), rgba(17,22,30,.96));
+      box-shadow: 0 18px 40px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.04);
       overflow: hidden;
     }
-    .header {
-      padding: 1.05rem;
+    .head {
+      padding: .95rem;
       border-bottom: 1px solid var(--line);
-      background: linear-gradient(90deg, rgba(82,247,196,.08), rgba(255,218,95,.08));
+      background: linear-gradient(90deg, rgba(91,245,201,.10), rgba(255,217,103,.10));
     }
     h1 {
       margin: 0;
       font-family: "Press Start 2P", monospace;
-      font-size: clamp(.8rem, 2.2vw, 1.1rem);
       line-height: 1.6;
+      font-size: clamp(.73rem, 1.7vw, 1rem);
       color: var(--accent);
-      text-shadow: 0 0 10px rgba(82,247,196,.38);
+      text-shadow: 0 0 10px rgba(91,245,201,.3);
     }
-    .subtitle { margin: .6rem 0 0; color: var(--muted); font-size: .92rem; }
-    .body { padding: 1rem; display: grid; gap: 1rem; }
+    .sub { margin-top: .5rem; font-size: .85rem; color: var(--muted); }
+
+    .layout { display: grid; grid-template-columns: 330px 1fr; gap: .9rem; padding: .9rem; }
     .panel {
       border: 1px solid var(--line);
-      border-radius: 12px;
-      padding: .9rem;
-      background: #141920;
+      border-radius: 11px;
+      padding: .78rem;
+      background: #131924;
     }
-    .label { display: block; margin-bottom: .45rem; font-size: .85rem; color: #b5c5e0; }
+    .label { display:block; margin-bottom:.35rem; color:#b9c8e5; font-size:.8rem; }
     input[type="text"], input[type="number"] {
       width: 100%;
-      border-radius: 10px;
-      border: 1px solid #4b5870;
-      background: #0f1319;
+      border: 1px solid #46526a;
+      border-radius: 9px;
+      background: #0d121a;
       color: var(--ink);
-      padding: .62rem .72rem;
+      padding: .56rem .62rem;
       font: inherit;
     }
-    .row { display: grid; grid-template-columns: 1fr 120px; gap: .75rem; }
-    .btns { display: flex; gap: .6rem; flex-wrap: wrap; margin-top: .7rem; }
-    button, a.btn {
+    .stack { display: grid; gap: .55rem; }
+    .row { display:grid; grid-template-columns: 1fr 110px; gap:.5rem; }
+    .btns { display:flex; gap:.45rem; flex-wrap:wrap; margin-top:.35rem; }
+    button, .btn {
       border: 1px solid var(--line);
-      border-radius: 10px;
-      padding: .58rem .84rem;
+      border-radius: 9px;
+      padding: .5rem .7rem;
       font: inherit;
       font-weight: 700;
       cursor: pointer;
       color: var(--ink);
-      background: #202833;
+      background: #1f2735;
       text-decoration: none;
-      transition: transform .14s ease, border-color .14s ease, box-shadow .14s ease;
     }
-    button:hover, a.btn:hover { transform: translateY(-1px); border-color: #64748b; }
-    button.primary {
-      background: linear-gradient(180deg, #51f0be 0%, #37d8a5 100%);
-      color: #062418;
-      border-color: #5fe9bd;
-      box-shadow: 0 8px 20px rgba(82,247,196,.25);
-    }
-    button.warn {
-      background: linear-gradient(180deg, #ffe38c 0%, #ffcf45 100%);
-      color: #282109;
-      border-color: #ffd75e;
-    }
-    .status {
-      margin-top: .8rem;
-      font-size: .88rem;
-      color: var(--muted);
-      min-height: 1.2rem;
-    }
+    button.primary { background: linear-gradient(180deg, #5bf5c9, #33dcae); color: #032116; border-color: #6ef5ce; }
+    button.warn { background: linear-gradient(180deg, #ffe083, #ffc942); color: #231c07; border-color: #ffe08a; }
+    button:disabled { opacity: .55; cursor: not-allowed; }
+    .status { margin-top: .55rem; min-height: 1.3rem; font-size: .83rem; color: var(--muted); }
     .status.error { color: var(--danger); }
-    .readout {
+    .status.ok { color: var(--ok); }
+    .readout { display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap:.45rem; margin-top:.45rem; }
+    .cell { border: 1px solid var(--line); border-radius: 8px; background:#0d131b; padding:.48rem; }
+    .cell b { display:block; font-size:.69rem; color:var(--accent2); margin-bottom:.16rem; }
+    .cell span { font-size:.88rem; font-weight:700; }
+
+    .mixer { border: 1px solid var(--line); border-radius: 11px; background: #111722; padding: .65rem; }
+    .transport { display:flex; flex-wrap:wrap; gap:.45rem; align-items:center; margin-bottom:.6rem; }
+    .transport .time { margin-left: auto; color: #b8c7e4; font-size: .83rem; }
+    .channels {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-      gap: .6rem;
-    }
-    .cell {
-      border: 1px solid var(--line);
-      border-radius: 10px;
-      background: #0f141b;
-      padding: .6rem;
-    }
-    .cell b { display:block; color:var(--accent-2); margin-bottom:.2rem; font-size:.72rem; }
-    .cell span { font-weight:700; font-size:1rem; }
-    .tracks {
-      margin: .3rem 0 0;
-      display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
+      grid-template-columns: repeat(8, minmax(88px, 1fr));
       gap: .45rem;
-      font-size: .78rem;
-      color: #b5c5e0;
     }
-    .tracks div {
-      background: #0e1319;
-      border: 1px solid #384459;
-      border-radius: 8px;
-      padding: .35rem .45rem;
-      text-align: center;
+    .ch {
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      padding: .46rem;
+      background: linear-gradient(180deg, #161d2a, #101620);
+      display: grid;
+      gap: .34rem;
+      justify-items: center;
     }
-    audio { width: 100%; margin-top: .6rem; }
-    .note { margin: .55rem 0 0; font-size: .8rem; color: var(--muted); line-height: 1.5; }
-    @media (max-width: 720px) {
+    .name { font-size: .72rem; color: #c2d0eb; letter-spacing: .02em; }
+    .vu {
+      width: 100%;
+      height: 112px;
+      border: 1px solid #3f4c62;
+      border-radius: 7px;
+      background: #090d13;
+      position: relative;
+      overflow: hidden;
+    }
+    .vu-fill {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 0%;
+      background: linear-gradient(0deg, #30db9d 0%, #a9eb5f 62%, #ffd651 100%);
+      transition: height .06s linear;
+    }
+    .db { font-size: .67rem; color: #96a8c8; }
+    input[type="range"].fader {
+      width: 100%;
+      writing-mode: bt-lr;
+      -webkit-appearance: slider-vertical;
+      appearance: slider-vertical;
+      height: 132px;
+      background: transparent;
+    }
+    .value { font-size: .7rem; color: #d7e4ff; }
+    .note { margin-top: .6rem; font-size: .78rem; color: var(--muted); line-height: 1.5; }
+
+    @media (max-width: 980px) {
+      .layout { grid-template-columns: 1fr; }
+      .channels { grid-template-columns: repeat(4, minmax(88px, 1fr)); }
+    }
+    @media (max-width: 560px) {
       .row { grid-template-columns: 1fr; }
-      .tracks { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .channels { grid-template-columns: repeat(2, minmax(88px, 1fr)); }
     }
   </style>
 </head>
@@ -147,132 +163,389 @@
   <div class="scan"></div>
   <main>
     <section class="frame">
-      <div class="header">
-        <h1>ATARI 8-TRACK REMIXER</h1>
-        <p class="subtitle">Paste a Spotify track URL and render a deterministic lo-fi tracker-style interpretation with exportable stems.</p>
+      <div class="head">
+        <h1>ATARI PROTRACKER STYLE 8-TRACK MIXER</h1>
+        <div class="sub">Generate full-song procedural stems from a Spotify link, then mix in realtime with digital VU metering.</div>
       </div>
-      <div class="body">
-        <div class="panel">
-          <label class="label" for="spotify-url">Spotify Track URL</label>
-          <div class="row">
-            <input id="spotify-url" type="text" placeholder="https://open.spotify.com/track/..." value="https://open.spotify.com/track/11dFghVXANMlKmJXsNCbNl">
-            <input id="bars" type="number" min="4" max="32" step="1" value="16" title="Bars">
-          </div>
-          <div class="btns">
-            <button id="preview" class="primary" type="button">Preview Remix</button>
-            <button id="export" class="warn" type="button">Export Stems ZIP</button>
-            <a class="btn" href="/" target="_blank" rel="noopener">Back Home</a>
-          </div>
-          <audio id="player" controls></audio>
-          <div id="status" class="status">Ready.</div>
-          <p class="note">This tool does not fetch Spotify audio. It procedurally generates an Atari-inspired version based on the track ID.</p>
-        </div>
 
-        <div class="panel">
-          <div class="readout">
-            <div class="cell"><b>Engine</b><span>ProTracker-inspired</span></div>
-            <div class="cell"><b>Voices</b><span>8 Tracks</span></div>
-            <div class="cell"><b>Output</b><span>WAV + stems ZIP</span></div>
-            <div class="cell"><b>Character</b><span>Lo-fi / Bitcrushed</span></div>
+      <div class="layout">
+        <section class="panel">
+          <div class="stack">
+            <div>
+              <label class="label" for="spotify-url">Spotify Track URL</label>
+              <input id="spotify-url" type="text" placeholder="https://open.spotify.com/track/..." value="https://open.spotify.com/track/11dFghVXANMlKmJXsNCbNl">
+            </div>
+            <div class="row">
+              <div>
+                <label class="label" for="duration-seconds">Length (seconds)</label>
+                <input id="duration-seconds" type="number" min="20" max="1200" step="1" placeholder="Auto">
+              </div>
+              <div>
+                <label class="label" for="master-gain">Master</label>
+                <input id="master-gain" type="number" min="0" max="2" step="0.05" value="1.00">
+              </div>
+            </div>
+            <div class="btns">
+              <button id="build" class="primary" type="button">Build Session</button>
+              <button id="download" class="warn" type="button" disabled>Export ZIP</button>
+              <a class="btn" href="/" target="_blank" rel="noopener">Home</a>
+            </div>
+            <div id="status" class="status">Ready.</div>
+
+            <div class="readout">
+              <div class="cell"><b>Track ID</b><span id="meta-id">-</span></div>
+              <div class="cell"><b>BPM</b><span id="meta-bpm">-</span></div>
+              <div class="cell"><b>Duration</b><span id="meta-duration">-</span></div>
+              <div class="cell"><b>Source</b><span id="meta-source">-</span></div>
+            </div>
           </div>
-          <div class="tracks">
-            <div>KICK</div>
-            <div>SNARE</div>
-            <div>HAT</div>
-            <div>BASS</div>
-            <div>ARP</div>
-            <div>CHORD</div>
-            <div>LEAD</div>
-            <div>FX</div>
+        </section>
+
+        <section class="mixer">
+          <div class="transport">
+            <button id="play" type="button" disabled>Play</button>
+            <button id="stop" type="button" disabled>Stop</button>
+            <button id="reset" type="button" disabled>Reset Faders</button>
+            <span class="time" id="time-readout">00:00 / 00:00</span>
           </div>
-        </div>
+
+          <div class="channels" id="channels"></div>
+          <div class="note">
+            Length defaults to Spotify duration when detectable. If Spotify blocks metadata, fallback is 180 seconds unless you set Length manually.
+          </div>
+        </section>
       </div>
     </section>
   </main>
 
   <script>
-    const spotifyInput = document.getElementById("spotify-url");
-    const barsInput = document.getElementById("bars");
-    const previewBtn = document.getElementById("preview");
-    const exportBtn = document.getElementById("export");
-    const statusEl = document.getElementById("status");
-    const player = document.getElementById("player");
+    const TRACKS = ["kick", "snare", "hat", "bass", "arp", "chord", "lead", "fx"];
+    const state = {
+      sessionId: null,
+      context: null,
+      masterGain: null,
+      buffers: new Map(),
+      gainNodes: new Map(),
+      analyserNodes: new Map(),
+      sources: [],
+      startedAt: 0,
+      offset: 0,
+      isPlaying: false,
+      duration: 0,
+      raf: 0,
+    };
 
-    function setStatus(message, isError = false) {
-      statusEl.textContent = message;
-      statusEl.classList.toggle("error", isError);
+    const el = {
+      spotifyUrl: document.getElementById("spotify-url"),
+      durationSeconds: document.getElementById("duration-seconds"),
+      masterGain: document.getElementById("master-gain"),
+      build: document.getElementById("build"),
+      download: document.getElementById("download"),
+      play: document.getElementById("play"),
+      stop: document.getElementById("stop"),
+      reset: document.getElementById("reset"),
+      status: document.getElementById("status"),
+      timeReadout: document.getElementById("time-readout"),
+      channels: document.getElementById("channels"),
+      metaId: document.getElementById("meta-id"),
+      metaBpm: document.getElementById("meta-bpm"),
+      metaDuration: document.getElementById("meta-duration"),
+      metaSource: document.getElementById("meta-source"),
+    };
+
+    const vuElements = new Map();
+
+    function setStatus(message, mode = "") {
+      el.status.textContent = message;
+      el.status.classList.toggle("error", mode === "error");
+      el.status.classList.toggle("ok", mode === "ok");
     }
 
-    function getParams() {
-      return {
-        spotify_url: spotifyInput.value.trim(),
-        bars: Number.parseInt(barsInput.value || "16", 10)
-      };
+    function fmtTime(seconds) {
+      const s = Math.max(0, Math.floor(seconds || 0));
+      const m = Math.floor(s / 60);
+      const rem = s % 60;
+      return `${String(m).padStart(2, "0")}:${String(rem).padStart(2, "0")}`;
     }
 
-    previewBtn.addEventListener("click", async () => {
-      const { spotify_url, bars } = getParams();
-      if (!spotify_url) {
-        setStatus("Paste a Spotify track URL first.", true);
-        return;
-      }
-      setStatus("Rendering preview...");
-      previewBtn.disabled = true;
-      try {
-        const qs = new URLSearchParams({ spotify_url, bars: String(bars) });
-        const res = await fetch(`/api/atari/preview?${qs.toString()}`);
-        if (!res.ok) {
-          const payload = await res.json().catch(() => ({}));
-          throw new Error(payload.error || "Preview failed");
+    function currentTimePosition() {
+      if (!state.isPlaying || !state.context) return state.offset;
+      return Math.min(state.duration, state.offset + (state.context.currentTime - state.startedAt));
+    }
+
+    function updateTimeReadout() {
+      el.timeReadout.textContent = `${fmtTime(currentTimePosition())} / ${fmtTime(state.duration)}`;
+    }
+
+    function buildChannelUi() {
+      el.channels.innerHTML = "";
+      TRACKS.forEach((track) => {
+        const box = document.createElement("div");
+        box.className = "ch";
+        box.innerHTML = `
+          <div class="name">${track.toUpperCase()}</div>
+          <div class="vu"><div class="vu-fill" data-track="${track}"></div></div>
+          <div class="db" data-db="${track}">-inf dB</div>
+          <input class="fader" data-fader="${track}" type="range" min="0" max="1.4" step="0.01" value="1.00">
+          <div class="value" data-value="${track}">1.00</div>
+        `;
+        el.channels.appendChild(box);
+
+        const fader = box.querySelector(`[data-fader="${track}"]`);
+        const valueEl = box.querySelector(`[data-value="${track}"]`);
+        const vuFill = box.querySelector(`[data-track="${track}"]`);
+        const dbEl = box.querySelector(`[data-db="${track}"]`);
+        vuElements.set(track, { vuFill, dbEl });
+
+        fader.addEventListener("input", () => {
+          const val = Number.parseFloat(fader.value);
+          valueEl.textContent = val.toFixed(2);
+          const gain = state.gainNodes.get(track);
+          if (gain) gain.gain.value = val;
+        });
+      });
+    }
+
+    async function ensureAudioContext() {
+      if (state.context) return state.context;
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      state.context = new AudioCtx();
+      state.masterGain = state.context.createGain();
+      state.masterGain.gain.value = Number.parseFloat(el.masterGain.value || "1") || 1;
+      state.masterGain.connect(state.context.destination);
+      return state.context;
+    }
+
+    function stopPlayback(resetOffset = false) {
+      state.sources.forEach((src) => {
+        try { src.stop(); } catch (_) {}
+      });
+      state.sources = [];
+      state.isPlaying = false;
+      if (resetOffset) state.offset = 0;
+      if (state.raf) cancelAnimationFrame(state.raf);
+      updateTimeReadout();
+    }
+
+    function renderMeters() {
+      if (!state.isPlaying) return;
+      TRACKS.forEach((track) => {
+        const analyser = state.analyserNodes.get(track);
+        const ui = vuElements.get(track);
+        if (!analyser || !ui) return;
+
+        const arr = new Uint8Array(analyser.fftSize);
+        analyser.getByteTimeDomainData(arr);
+
+        let peak = 0;
+        for (let i = 0; i < arr.length; i += 1) {
+          const v = (arr[i] - 128) / 128;
+          const a = Math.abs(v);
+          if (a > peak) peak = a;
         }
-        const blob = await res.blob();
-        const src = URL.createObjectURL(blob);
-        player.src = src;
-        await player.play().catch(() => {});
-        const bpm = res.headers.get("X-Atari-BPM");
-        setStatus(`Preview ready${bpm ? ` at ${bpm} BPM` : ""}.`);
-      } catch (err) {
-        setStatus(err.message || "Preview failed.", true);
-      } finally {
-        previewBtn.disabled = false;
-      }
-    });
 
-    exportBtn.addEventListener("click", async () => {
-      const payload = getParams();
-      if (!payload.spotify_url) {
-        setStatus("Paste a Spotify track URL first.", true);
+        const normalized = Math.min(1, peak * 1.8);
+        ui.vuFill.style.height = `${Math.round(normalized * 100)}%`;
+        const db = peak > 0.00001 ? (20 * Math.log10(peak)).toFixed(1) : "-inf";
+        ui.dbEl.textContent = `${db} dB`;
+      });
+
+      updateTimeReadout();
+      if (currentTimePosition() >= state.duration) {
+        stopPlayback(true);
         return;
       }
-      setStatus("Building stem export ZIP...");
-      exportBtn.disabled = true;
+      state.raf = requestAnimationFrame(renderMeters);
+    }
+
+    async function decodeStem(url) {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Failed to load stem");
+      const buf = await res.arrayBuffer();
+      return state.context.decodeAudioData(buf.slice(0));
+    }
+
+    async function loadSessionStems(stemUrls) {
+      state.buffers.clear();
+      state.gainNodes.clear();
+      state.analyserNodes.clear();
+
+      for (const track of TRACKS) {
+        const gain = state.context.createGain();
+        gain.gain.value = 1;
+        const analyser = state.context.createAnalyser();
+        analyser.fftSize = 512;
+        analyser.smoothingTimeConstant = 0.74;
+
+        gain.connect(analyser);
+        analyser.connect(state.masterGain);
+
+        state.gainNodes.set(track, gain);
+        state.analyserNodes.set(track, analyser);
+      }
+
+      await Promise.all(TRACKS.map(async (track) => {
+        const buffer = await decodeStem(stemUrls[track]);
+        state.buffers.set(track, buffer);
+      }));
+
+      state.duration = state.buffers.get(TRACKS[0])?.duration || 0;
+      state.offset = 0;
+      updateTimeReadout();
+    }
+
+    function startPlayback() {
+      if (state.isPlaying || !state.context) return;
+      const offset = Math.min(state.offset, Math.max(0, state.duration - 0.05));
+      state.sources = [];
+
+      TRACKS.forEach((track) => {
+        const buffer = state.buffers.get(track);
+        const gain = state.gainNodes.get(track);
+        if (!buffer || !gain) return;
+        const src = state.context.createBufferSource();
+        src.buffer = buffer;
+        src.connect(gain);
+        src.start(0, offset);
+        state.sources.push(src);
+      });
+
+      state.startedAt = state.context.currentTime;
+      state.isPlaying = true;
+      renderMeters();
+    }
+
+    function pausePlayback() {
+      if (!state.isPlaying || !state.context) return;
+      state.offset = currentTimePosition();
+      stopPlayback(false);
+    }
+
+    async function buildSession() {
+      const spotifyUrl = el.spotifyUrl.value.trim();
+      if (!spotifyUrl) {
+        setStatus("Paste a Spotify track URL first.", "error");
+        return;
+      }
+
+      const durationRaw = el.durationSeconds.value.trim();
+      const payload = { spotify_url: spotifyUrl };
+      if (durationRaw) payload.duration_seconds = Number.parseInt(durationRaw, 10);
+
+      el.build.disabled = true;
+      el.download.disabled = true;
+      el.play.disabled = true;
+      el.stop.disabled = true;
+      el.reset.disabled = true;
+      setStatus("Building full-length Atari session...");
+
       try {
-        const res = await fetch("/api/atari/export", {
+        await ensureAudioContext();
+        pausePlayback();
+
+        const res = await fetch("/api/atari/session", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
+          body: JSON.stringify(payload),
         });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Session build failed");
+
+        state.sessionId = data.session_id;
+        await loadSessionStems(data.stem_urls);
+
+        el.metaId.textContent = data.track_id;
+        el.metaBpm.textContent = String(data.bpm);
+        el.metaDuration.textContent = `${data.duration_seconds}s`;
+        el.metaSource.textContent = data.duration_source;
+
+        el.download.disabled = false;
+        el.play.disabled = false;
+        el.stop.disabled = false;
+        el.reset.disabled = false;
+
+        setStatus(`Session ready (${data.duration_seconds}s, ${data.bpm} BPM).`, "ok");
+      } catch (err) {
+        setStatus(err.message || "Session build failed.", "error");
+      } finally {
+        el.build.disabled = false;
+      }
+    }
+
+    async function downloadSessionZip() {
+      if (!state.sessionId) {
+        setStatus("Build a session first.", "error");
+        return;
+      }
+      try {
+        setStatus("Preparing ZIP export...");
+        const res = await fetch(`/api/atari/session/${state.sessionId}/export`, { method: "POST" });
         if (!res.ok) {
-          const body = await res.json().catch(() => ({}));
-          throw new Error(body.error || "Export failed");
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || "Export failed");
         }
         const blob = await res.blob();
-        const href = URL.createObjectURL(blob);
+        const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
-        const contentDisposition = res.headers.get("Content-Disposition") || "";
-        const match = contentDisposition.match(/filename="([^"]+)"/);
-        a.href = href;
-        a.download = match ? match[1] : "atari-stems.zip";
+        a.href = url;
+        const cd = res.headers.get("Content-Disposition") || "";
+        const m = cd.match(/filename="([^"]+)"/);
+        a.download = m ? m[1] : "atari-stems.zip";
         document.body.appendChild(a);
         a.click();
         a.remove();
-        setStatus("Stem export downloaded.");
+        URL.revokeObjectURL(url);
+        setStatus("ZIP export downloaded.", "ok");
       } catch (err) {
-        setStatus(err.message || "Export failed.", true);
-      } finally {
-        exportBtn.disabled = false;
+        setStatus(err.message || "Export failed.", "error");
+      }
+    }
+
+    el.masterGain.addEventListener("input", () => {
+      const val = Number.parseFloat(el.masterGain.value || "1") || 1;
+      if (state.masterGain) state.masterGain.gain.value = val;
+    });
+
+    el.build.addEventListener("click", buildSession);
+    el.download.addEventListener("click", downloadSessionZip);
+
+    el.play.addEventListener("click", async () => {
+      if (!state.sessionId) {
+        setStatus("Build a session first.", "error");
+        return;
+      }
+      await ensureAudioContext();
+      if (state.context.state === "suspended") await state.context.resume();
+      if (state.isPlaying) {
+        pausePlayback();
+        setStatus("Paused.");
+      } else {
+        startPlayback();
+        setStatus("Playing.", "ok");
       }
     });
+
+    el.stop.addEventListener("click", () => {
+      pausePlayback();
+      state.offset = 0;
+      updateTimeReadout();
+      setStatus("Stopped.");
+    });
+
+    el.reset.addEventListener("click", () => {
+      TRACKS.forEach((track) => {
+        const slider = document.querySelector(`[data-fader="${track}"]`);
+        const valueEl = document.querySelector(`[data-value="${track}"]`);
+        if (slider) slider.value = "1.00";
+        if (valueEl) valueEl.textContent = "1.00";
+        const gain = state.gainNodes.get(track);
+        if (gain) gain.gain.value = 1;
+      });
+      setStatus("Faders reset.");
+    });
+
+    buildChannelUi();
+    updateTimeReadout();
   </script>
 </body>
 </html>
