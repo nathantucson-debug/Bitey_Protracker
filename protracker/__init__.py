@@ -21,6 +21,9 @@ ATARI_SESSION_TTL_SECONDS = 3600
 ATARI_SESSION_CACHE: dict[str, dict] = {}
 ATARI_SESSION_LOCK = threading.Lock()
 ATARI_SESSION_DIR = "/tmp/atari_sessions"
+ATARI_JOB_TTL_SECONDS = 3600
+ATARI_JOB_CACHE: dict[str, dict] = {}
+ATARI_JOB_LOCK = threading.Lock()
 
 
 def _midi_to_hz(midi_note: int) -> float:
@@ -51,6 +54,59 @@ def _cleanup_atari_sessions() -> None:
                 except OSError:
                     pass
             ATARI_SESSION_CACHE.pop(sid, None)
+
+
+def _cleanup_atari_jobs() -> None:
+    cutoff = time.time() - ATARI_JOB_TTL_SECONDS
+    with ATARI_JOB_LOCK:
+        stale_ids = [jid for jid, payload in ATARI_JOB_CACHE.items() if payload.get("created_at", 0.0) < cutoff]
+        for jid in stale_ids:
+            ATARI_JOB_CACHE.pop(jid, None)
+
+
+def _set_job_status(job_id: str, payload: dict) -> None:
+    with ATARI_JOB_LOCK:
+        if job_id in ATARI_JOB_CACHE:
+            ATARI_JOB_CACHE[job_id].update(payload)
+
+
+def _start_atari_job(file_bytes: bytes, source_name: str) -> str:
+    _cleanup_atari_jobs()
+    job_id = uuid.uuid4().hex
+    with ATARI_JOB_LOCK:
+        ATARI_JOB_CACHE[job_id] = {
+            "created_at": time.time(),
+            "status": "queued",
+            "source_name": source_name,
+        }
+
+    def worker() -> None:
+        _set_job_status(job_id, {"status": "processing"})
+        try:
+            remix = _build_atari_remix_from_wav(file_bytes, source_name)
+            session_id = _create_atari_session(remix, source_name)
+            result = {
+                "ok": True,
+                "session_id": session_id,
+                "source_id": remix["source_id"],
+                "source_name": source_name,
+                "bpm": remix["bpm"],
+                "duration_seconds": remix["duration_seconds"],
+                "estimated_key": remix["estimated_key"],
+                "tempo_map_bpm": remix["tempo_map_bpm"],
+                "tracks": ATARI_TRACK_NAMES,
+                "mix_url": f"/api/atari/session/{session_id}/mix.wav",
+                "stem_urls": {name: f"/api/atari/session/{session_id}/stem/{name}.wav" for name in ATARI_TRACK_NAMES},
+                "export_url": f"/api/atari/session/{session_id}/export",
+            }
+            _set_job_status(job_id, {"status": "ready", "result": result})
+        except ValueError as exc:
+            _set_job_status(job_id, {"status": "failed", "error": str(exc)})
+        except Exception:
+            _set_job_status(job_id, {"status": "failed", "error": "Build failed on server. Try a shorter PCM WAV file."})
+
+    threading.Thread(target=worker, daemon=True).start()
+    return job_id
 
 
 def _create_atari_session(remix: dict, source_name: str) -> str:
@@ -577,28 +633,23 @@ def atari_session_create():
     if len(file_bytes) > 80 * 1024 * 1024:
         return jsonify({"error": "WAV file too large (max 80 MB)"}), 400
 
-    try:
-        remix = _build_atari_remix_from_wav(file_bytes, upload.filename)
-    except ValueError as exc:
-        return jsonify({"error": str(exc)}), 400
+    job_id = _start_atari_job(file_bytes, upload.filename)
+    return jsonify({"ok": True, "job_id": job_id, "status": "queued"}), 202
 
-    session_id = _create_atari_session(remix, upload.filename)
-    return jsonify(
-        {
-            "ok": True,
-            "session_id": session_id,
-            "source_id": remix["source_id"],
-            "source_name": upload.filename,
-            "bpm": remix["bpm"],
-            "duration_seconds": remix["duration_seconds"],
-            "estimated_key": remix["estimated_key"],
-            "tempo_map_bpm": remix["tempo_map_bpm"],
-            "tracks": ATARI_TRACK_NAMES,
-            "mix_url": f"/api/atari/session/{session_id}/mix.wav",
-            "stem_urls": {name: f"/api/atari/session/{session_id}/stem/{name}.wav" for name in ATARI_TRACK_NAMES},
-            "export_url": f"/api/atari/session/{session_id}/export",
-        }
-    )
+
+@protracker_bp.get("/api/atari/job/<job_id>")
+def atari_job_status(job_id: str):
+    _cleanup_atari_jobs()
+    with ATARI_JOB_LOCK:
+        job = ATARI_JOB_CACHE.get(job_id)
+    if not job:
+        return jsonify({"error": "job not found or expired"}), 404
+    status = job.get("status", "queued")
+    if status == "ready":
+        return jsonify({"ok": True, "status": "ready", **(job.get("result") or {})})
+    if status == "failed":
+        return jsonify({"ok": False, "status": "failed", "error": job.get("error", "Build failed")}), 200
+    return jsonify({"ok": True, "status": status}), 200
 
 
 @protracker_bp.get("/api/atari/session/<session_id>/mix.wav")

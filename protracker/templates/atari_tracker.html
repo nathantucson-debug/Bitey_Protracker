@@ -429,6 +429,26 @@
       stopPlayback(false);
     }
 
+    async function waitForJob(jobId) {
+      const maxPolls = 240;
+      for (let i = 0; i < maxPolls; i += 1) {
+        const res = await fetch(`/api/atari/job/${jobId}`);
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(data.error || "Build job failed");
+        }
+        if (data.status === "ready") {
+          return data;
+        }
+        if (data.status === "failed") {
+          throw new Error(data.error || "Build failed");
+        }
+        setStatus(`Building session... ${Math.min(99, Math.floor((i / maxPolls) * 100))}%`);
+        await new Promise((r) => setTimeout(r, 1000));
+      }
+      throw new Error("Build timed out. Try a shorter PCM WAV file.");
+    }
+
     async function buildSession() {
       const file = el.sourceWav.files?.[0];
       if (!file) {
@@ -471,7 +491,10 @@
             throw new Error(`Session build failed (${res.status}). Try a shorter PCM WAV file.`);
           }
         }
-        if (!res.ok) throw new Error(data.error || "Session build failed");
+        if (!res.ok && res.status !== 202) throw new Error(data.error || "Session build failed");
+        if (!data.job_id) throw new Error("Build job was not created");
+
+        data = await waitForJob(data.job_id);
 
         state.sessionId = data.session_id;
         await loadSessionStems(data.stem_urls);
