@@ -31,6 +31,20 @@ def _midi_to_hz(midi_note: int) -> float:
     return 440.0 * (2 ** ((midi_note - 69) / 12))
 
 
+def _midi_to_tracker_note(midi_note: int | None) -> str:
+    if midi_note is None:
+        return "---"
+    names = ["C-", "C#", "D-", "D#", "E-", "F-", "F#", "G-", "G#", "A-", "A#", "B-"]
+    n = int(max(0, min(127, midi_note)))
+    octave = max(0, min(9, (n // 12) - 1))
+    return f"{names[n % 12]}{octave}"
+
+
+def _tracker_cell(note: int | None, volume_0_1: float = 0.0, fx: str = "000") -> str:
+    vol = max(0, min(64, int(round(volume_0_1 * 64))))
+    return f"{_midi_to_tracker_note(note)} {vol:02X} {fx.upper()[:3].ljust(3, '0')}"
+
+
 def _cleanup_atari_sessions() -> None:
     cutoff = time.time() - ATARI_SESSION_TTL_SECONDS
     with ATARI_SESSION_LOCK:
@@ -95,6 +109,9 @@ def _start_atari_job(file_bytes: bytes, source_name: str) -> str:
                 "duration_seconds": remix["duration_seconds"],
                 "estimated_key": remix["estimated_key"],
                 "tempo_map_bpm": remix["tempo_map_bpm"],
+                "rows_per_pattern": remix["rows_per_pattern"],
+                "pattern_rows": remix["pattern_rows"],
+                "row_times_seconds": remix["row_times_seconds"],
                 "tracks": ATARI_TRACK_NAMES,
                 "mix_url": f"/api/atari/session/{session_id}/mix.wav",
                 "stem_urls": {name: f"/api/atari/session/{session_id}/stem/{name}.wav" for name in ATARI_TRACK_NAMES},
@@ -141,6 +158,9 @@ def _create_atari_session(remix: dict, source_name: str) -> str:
         "duration_seconds": remix["duration_seconds"],
         "estimated_key": remix["estimated_key"],
         "tempo_map_bpm": remix["tempo_map_bpm"],
+        "rows_per_pattern": remix["rows_per_pattern"],
+        "pattern_rows": remix["pattern_rows"],
+        "row_times_seconds": remix["row_times_seconds"],
         "mix_path": mix_path,
         "stem_paths": stem_paths,
     }
@@ -800,6 +820,7 @@ def _build_atari_remix_from_wav(file_bytes: bytes, source_name: str) -> dict:
     sample_rate = 12000 if duration_seconds < 120 else 8000
     total_samples = int(duration_seconds * sample_rate)
     step_starts = _build_step_starts(total_samples, sample_rate, tempo_map_bpm)
+    row_times_seconds = [round(s / sample_rate, 4) for s in step_starts]
     instruments = _make_tracker_instruments(sample_rate)
     stems_float = {name: array("f", [0.0]) * total_samples for name in ATARI_TRACK_NAMES}
 
@@ -849,26 +870,37 @@ def _build_atari_remix_from_wav(file_bytes: bytes, source_name: str) -> dict:
     max_k = max(kick_strength, default=1.0) or 1.0
     max_s = max(snare_strength, default=1.0) or 1.0
     max_h = max(hat_strength, default=1.0) or 1.0
+    rows_per_pattern = 64
+    pattern_rows: list[list[str]] = []
 
     for i, start in enumerate(step_starts):
         end = step_starts[i + 1] if i + 1 < len(step_starts) else min(total_samples, start + int(sample_rate * 0.12))
         step_len = max(1, end - start)
         note = _median_midi(step_pitches[i])
+        row_cells = ["--- 00 000" for _ in range(8)]
         if kick_strength[i] / max_k > 0.23:
-            _render_one_shot(stems_float["kick"], start, instruments["kick"], 0.9 * (kick_strength[i] / max_k))
+            k_norm = max(0.0, min(1.0, kick_strength[i] / max_k))
+            _render_one_shot(stems_float["kick"], start, instruments["kick"], 0.9 * k_norm)
+            row_cells[0] = _tracker_cell(36, k_norm, "D01")
         if snare_strength[i] / max_s > 0.20:
-            _render_one_shot(stems_float["snare"], start, instruments["snare"], 0.8 * (snare_strength[i] / max_s))
+            s_norm = max(0.0, min(1.0, snare_strength[i] / max_s))
+            _render_one_shot(stems_float["snare"], start, instruments["snare"], 0.8 * s_norm)
+            row_cells[1] = _tracker_cell(38, s_norm, "D02")
         if hat_strength[i] / max_h > 0.16:
-            _render_one_shot(stems_float["hat"], start, instruments["hat"], 0.6 * (hat_strength[i] / max_h))
+            h_norm = max(0.0, min(1.0, hat_strength[i] / max_h))
+            _render_one_shot(stems_float["hat"], start, instruments["hat"], 0.6 * h_norm)
+            row_cells[2] = _tracker_cell(42, h_norm, "D03")
         if note is not None:
             bass_note = max(28, note - 12)
             _render_wavetable_note(
                 stems_float["bass"], start, int(step_len * 1.8), instruments["bass"], _midi_to_hz(bass_note), sample_rate, 0.32
             )
+            row_cells[3] = _tracker_cell(bass_note, 0.55, "F10")
             if i % 2 == 0:
                 _render_wavetable_note(
                     stems_float["lead"], start, int(step_len * 1.1), instruments["lead"], _midi_to_hz(note), sample_rate, 0.22
                 )
+                row_cells[6] = _tracker_cell(note, 0.45, "A03")
             if i % 4 == 0:
                 root = max(36, note - (note % 12))
                 third = root + (3 if "minor" in key_name else 4)
@@ -876,11 +908,15 @@ def _build_atari_remix_from_wav(file_bytes: bytes, source_name: str) -> dict:
                 _render_wavetable_note(stems_float["chord"], start, int(step_len * 3.5), instruments["chord"], _midi_to_hz(root), sample_rate, 0.12)
                 _render_wavetable_note(stems_float["chord"], start, int(step_len * 3.5), instruments["chord"], _midi_to_hz(third), sample_rate, 0.1)
                 _render_wavetable_note(stems_float["chord"], start, int(step_len * 3.5), instruments["chord"], _midi_to_hz(fifth), sample_rate, 0.1)
+                row_cells[5] = _tracker_cell(root, 0.35, "C40")
             if i % 2 == 0:
                 arp_note = note + (12 if i % 4 == 0 else 7)
                 _render_wavetable_note(stems_float["arp"], start, int(step_len * 0.9), instruments["arp"], _midi_to_hz(arp_note), sample_rate, 0.14)
+                row_cells[4] = _tracker_cell(arp_note, 0.35, "047")
         if i % 16 == 15:
             _render_wavetable_note(stems_float["fx"], start, int(step_len * 1.5), instruments["fx"], 900.0, sample_rate, 0.1)
+            row_cells[7] = _tracker_cell(84, 0.28, "E9F")
+        pattern_rows.append(row_cells)
 
     processed_stems = {}
     for name, data in stems_float.items():
@@ -907,6 +943,9 @@ def _build_atari_remix_from_wav(file_bytes: bytes, source_name: str) -> dict:
         "sample_rate": sample_rate,
         "bpm": int(round(avg_bpm)),
         "tempo_map_bpm": [round(v, 2) for v in tempo_map_bpm],
+        "rows_per_pattern": rows_per_pattern,
+        "pattern_rows": pattern_rows,
+        "row_times_seconds": row_times_seconds,
         "duration_seconds": duration_seconds,
         "estimated_key": key_name,
         "stems_wav": stems_wav,
@@ -1000,6 +1039,9 @@ def atari_session_export(session_id: str):
                 "duration_seconds": session["duration_seconds"],
                 "estimated_key": session["estimated_key"],
                 "tempo_map_bpm": session["tempo_map_bpm"],
+                "rows_per_pattern": session["rows_per_pattern"],
+                "pattern_rows": session["pattern_rows"],
+                "row_times_seconds": session["row_times_seconds"],
                 "sample_rate": session["sample_rate"],
                 "tracks": ATARI_TRACK_NAMES,
             }

@@ -416,6 +416,9 @@
       duration: 0,
       raf: 0,
       jobId: "",
+      patternRowsData: [],
+      rowTimesSeconds: [],
+      rowsPerPattern: 64,
     };
 
     const el = {
@@ -447,6 +450,7 @@
       right: new Uint8Array(512),
     };
     const patternRows = [];
+    const PATTERN_WINDOW_ROWS = 32;
 
     function setStatus(message, mode = "") {
       el.status.textContent = message;
@@ -477,48 +481,70 @@
     function updateTimeReadout() {
       const pos = currentTimePosition();
       el.timeReadout.textContent = `${fmtTime(pos)} / ${fmtTime(state.duration)}`;
-      const row = Math.min(63, Math.floor(pos * 4) % 64);
-      el.metaPos.textContent = String(row).padStart(2, "0");
-      el.teleRow.textContent = String(row).padStart(2, "0");
+      const absRow = getAbsoluteRowAtTime(pos);
+      const rowInPattern = absRow % Math.max(1, state.rowsPerPattern);
+      el.metaPos.textContent = String(rowInPattern).padStart(2, "0");
+      el.teleRow.textContent = String(rowInPattern).padStart(2, "0");
       el.teleHz.textContent = String(Math.max(0, Math.floor(state.context?.sampleRate || 0))).padStart(5, "0");
-      const cpu = state.isPlaying ? Math.min(99, 18 + ((row * 7) % 25)) : 0;
+      const cpu = state.isPlaying ? Math.min(99, 18 + ((rowInPattern * 7) % 25)) : 0;
       el.teleCpu.textContent = String(cpu).padStart(2, "0");
-      updatePatternRoll(row);
+      updatePatternRoll(absRow);
     }
 
-    function trackerCell(track, row) {
-      const notes = ["C-", "D-", "E-", "F-", "G-", "A-", "B-"];
-      if ((row + track) % 4 !== 0) return "--- ----";
-      const n = notes[(row + track * 2) % notes.length];
-      const oct = 2 + ((row + track) % 3);
-      const fx = ((row * 17 + track * 9) % 255).toString(16).toUpperCase().padStart(2, "0");
-      return `${n}${oct} 10${fx}`;
+    function getAbsoluteRowAtTime(seconds) {
+      const rows = state.rowTimesSeconds;
+      if (!rows || rows.length === 0) return Math.max(0, Math.floor(seconds * 4));
+      if (seconds <= rows[0]) return 0;
+      if (seconds >= rows[rows.length - 1]) return rows.length - 1;
+      let lo = 0;
+      let hi = rows.length - 1;
+      while (lo <= hi) {
+        const mid = (lo + hi) >> 1;
+        if (rows[mid] <= seconds) lo = mid + 1;
+        else hi = mid - 1;
+      }
+      return Math.max(0, hi);
     }
 
-    function initPatternRoll() {
+    function renderPatternWindow(centerAbsRow = 0) {
       el.pattern.innerHTML = "";
       patternRows.length = 0;
-      for (let row = 0; row < 32; row += 1) {
+      const totalRows = state.patternRowsData.length || PATTERN_WINDOW_ROWS;
+      const start = Math.max(0, centerAbsRow - Math.floor(PATTERN_WINDOW_ROWS / 2));
+      const end = Math.min(totalRows, start + PATTERN_WINDOW_ROWS);
+      for (let row = start; row < end; row += 1) {
+        const cells = state.patternRowsData[row] || ["--- 00 000", "--- 00 000", "--- 00 000", "--- 00 000", "--- 00 000", "--- 00 000", "--- 00 000", "--- 00 000"];
         const line = document.createElement("div");
         line.className = "line";
         const idx = document.createElement("span");
         idx.className = "idx";
-        idx.textContent = String(row).padStart(2, "0");
+        idx.textContent = String(row % Math.max(1, state.rowsPerPattern)).padStart(2, "0");
         line.appendChild(idx);
         for (let ch = 0; ch < 8; ch += 1) {
           const col = document.createElement("span");
           col.className = "col";
-          col.textContent = trackerCell(ch, row);
+          col.textContent = cells[ch] || "--- 00 000";
           line.appendChild(col);
         }
+        line.dataset.absRow = String(row);
         el.pattern.appendChild(line);
         patternRows.push(line);
       }
     }
 
-    function updatePatternRoll(currentRow) {
+    function initPatternRoll() {
+      renderPatternWindow(0);
+    }
+
+    function updatePatternRoll(currentAbsRow) {
+      const firstRow = Number.parseInt(patternRows[0]?.dataset.absRow || "0", 10) || 0;
+      const lastRow = Number.parseInt(patternRows[patternRows.length - 1]?.dataset.absRow || "0", 10) || 0;
+      if (currentAbsRow < firstRow + 4 || currentAbsRow > lastRow - 4) {
+        renderPatternWindow(currentAbsRow);
+      }
       for (let i = 0; i < patternRows.length; i += 1) {
-        patternRows[i].classList.toggle("hot", i === (currentRow % patternRows.length));
+        const absRow = Number.parseInt(patternRows[i].dataset.absRow || "-1", 10);
+        patternRows[i].classList.toggle("hot", absRow === currentAbsRow);
       }
     }
 
@@ -762,6 +788,10 @@
 
         data = await waitForJob(data.job_id);
         state.sessionId = data.session_id;
+        state.patternRowsData = Array.isArray(data.pattern_rows) ? data.pattern_rows : [];
+        state.rowTimesSeconds = Array.isArray(data.row_times_seconds) ? data.row_times_seconds : [];
+        state.rowsPerPattern = Number.isFinite(data.rows_per_pattern) ? Math.max(1, data.rows_per_pattern) : 64;
+        renderPatternWindow(0);
         await loadSessionStems(data.stem_urls);
 
         el.metaSource.textContent = data.source_name || "source.wav";
