@@ -10,6 +10,7 @@ import random
 import re
 import sqlite3
 import smtplib
+import sys
 import threading
 import time
 import uuid
@@ -22,6 +23,11 @@ from urllib import parse, request
 from urllib.error import HTTPError, URLError
 
 from flask import Flask, Response, jsonify, redirect, render_template, request as flask_request
+
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+
 from protracker import protracker_bp
 
 APP_HOST = os.getenv("APP_HOST", "0.0.0.0")
