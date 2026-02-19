@@ -831,147 +831,197 @@ def _build_atari_remix_from_wav(file_bytes: bytes, source_name: str) -> dict:
     tempo_map_bpm, avg_bpm = _estimate_tempo_map(onsets, fps, duration_seconds)
     key_name, _ = _estimate_key(mono[: sample_rate * 30], sample_rate)
 
-    step_starts = _build_step_starts(total_samples, sample_rate, tempo_map_bpm, max_rows=2048)
-    row_times_seconds = [round(s / sample_rate, 4) for s in step_starts]
-    rows_per_pattern = 64
-
-    # Frequency-region decomposition keeps structure of the original song while allowing tracker-style remixing.
     low = _simple_lowpass(mono, alpha=0.03)
-    body = _simple_lowpass(mono, alpha=0.1)
-    air = _simple_lowpass(mono, alpha=0.24)
-    bass_band = array("f", [0.0]) * total_samples
-    lowmid_band = array("f", [0.0]) * total_samples
+    mid_lp = _simple_lowpass(mono, alpha=0.16)
+    low_band = array("f", [0.0]) * total_samples
     mid_band = array("f", [0.0]) * total_samples
     high_band = array("f", [0.0]) * total_samples
     for i in range(total_samples):
-        bass_band[i] = low[i]
-        lowmid_band[i] = body[i] - low[i]
-        mid_band[i] = air[i] - body[i]
-        high_band[i] = mono[i] - air[i]
+        low_band[i] = low[i]
+        mid_band[i] = mid_lp[i] - low[i]
+        high_band[i] = mono[i] - mid_lp[i]
 
-    step_bass = [0.0] * len(step_starts)
-    step_mid = [0.0] * len(step_starts)
-    step_high = [0.0] * len(step_starts)
-    step_notes: list[int | None] = [None] * len(step_starts)
-    last_note: int | None = None
+    step_starts = _build_step_starts(total_samples, sample_rate, tempo_map_bpm, max_rows=2048)
+    row_times_seconds = [round(s / sample_rate, 4) for s in step_starts]
+    rows_per_pattern = 64
+    instruments = _make_tracker_instruments(sample_rate)
+
+    step_low = [0.0 for _ in range(len(step_starts))]
+    step_mid = [0.0 for _ in range(len(step_starts))]
+    step_high = [0.0 for _ in range(len(step_starts))]
+    bass_candidates: list[int | None] = [None for _ in range(len(step_starts))]
+    lead_candidates: list[int | None] = [None for _ in range(len(step_starts))]
 
     for i, start in enumerate(step_starts):
         end = step_starts[i + 1] if i + 1 < len(step_starts) else total_samples
         if end <= start:
             continue
-        sb = 0.0
-        sm = 0.0
-        sh = 0.0
+        accum_low = 0.0
+        accum_mid = 0.0
+        accum_high = 0.0
         for j in range(start, end):
-            sb += abs(bass_band[j])
-            sm += abs(mid_band[j])
-            sh += abs(high_band[j])
-        scale = 1.0 / (end - start)
-        step_bass[i] = sb * scale
-        step_mid[i] = sm * scale
-        step_high[i] = sh * scale
+            accum_low += abs(low_band[j])
+            accum_mid += abs(mid_band[j])
+            accum_high += abs(high_band[j])
+        norm = 1.0 / (end - start)
+        step_low[i] = accum_low * norm
+        step_mid[i] = accum_mid * norm
+        step_high[i] = accum_high * norm
 
-        if i % 2 == 0:
-            probe_end = min(total_samples, start + 320)
-            hz = _estimate_fundamental_hz(mid_band[start:probe_end], sample_rate)
-            if hz is not None:
-                midi = int(round(69 + 12 * math.log2(hz / 440.0)))
-                if 24 <= midi <= 96:
-                    last_note = midi
-        step_notes[i] = last_note
+        probe_end = min(total_samples, start + 384)
+        low_probe = low_band[start:probe_end]
+        mid_probe = mid_band[start:probe_end]
+        low_hz = _estimate_fundamental_hz(low_probe, sample_rate)
+        mid_hz = _estimate_fundamental_hz(mid_probe, sample_rate)
+        if low_hz is not None:
+            bass_midi = int(round(69 + 12 * math.log2(low_hz / 440.0)))
+            if 20 <= bass_midi <= 72:
+                bass_candidates[i] = bass_midi
+        if mid_hz is not None:
+            lead_midi = int(round(69 + 12 * math.log2(mid_hz / 440.0)))
+            if 36 <= lead_midi <= 96:
+                lead_candidates[i] = lead_midi
 
-    max_b = max(step_bass, default=1.0) or 1.0
-    max_m = max(step_mid, default=1.0) or 1.0
-    max_h = max(step_high, default=1.0) or 1.0
+    def smooth_notes(candidates: list[int | None], hold_rows: int, lo: int, hi: int) -> list[int | None]:
+        out: list[int | None] = [None for _ in candidates]
+        last: int | None = None
+        hold = 0
+        for idx, cand in enumerate(candidates):
+            if cand is not None:
+                cand = max(lo, min(hi, cand))
+                if last is not None and abs(cand - last) <= 2:
+                    cand = last
+                last = cand
+                hold = hold_rows
+                out[idx] = cand
+            else:
+                if hold > 0 and last is not None:
+                    out[idx] = last
+                    hold -= 1
+                else:
+                    out[idx] = None
+        return out
 
-    kick_gate = array("f", [0.0]) * total_samples
-    snare_gate = array("f", [0.0]) * total_samples
-    hat_gate = array("f", [0.0]) * total_samples
-    lead_gate = array("f", [0.0]) * total_samples
-    chord_gate = array("f", [0.0]) * total_samples
-    arp_gate = array("f", [0.0]) * total_samples
-    fx_gate = array("f", [0.0]) * total_samples
+    bass_lane = smooth_notes(bass_candidates, hold_rows=3, lo=24, hi=60)
+    lead_lane = smooth_notes(lead_candidates, hold_rows=2, lo=36, hi=92)
+
+    max_low = max(step_low, default=1.0) or 1.0
+    max_mid = max(step_mid, default=1.0) or 1.0
+    max_high = max(step_high, default=1.0) or 1.0
+    stems_float = {name: array("f", [0.0]) * total_samples for name in ATARI_TRACK_NAMES}
     pattern_rows: list[list[str]] = []
 
-    prev_b = 0.0
-    prev_mh = 0.0
+    prev_low = 0.0
+    prev_drum = 0.0
     for i, start in enumerate(step_starts):
         end = step_starts[i + 1] if i + 1 < len(step_starts) else total_samples
-        b_norm = max(0.0, min(1.0, step_bass[i] / max_b))
-        m_norm = max(0.0, min(1.0, step_mid[i] / max_m))
-        h_norm = max(0.0, min(1.0, step_high[i] / max_h))
-        drum_transient = max(0.0, (m_norm + h_norm) - prev_mh)
-        bass_transient = max(0.0, b_norm - prev_b)
-        prev_b = b_norm
-        prev_mh = m_norm + h_norm
+        step_len = max(1, end - start)
 
-        kick_amt = min(1.0, bass_transient * 2.0) if bass_transient > 0.05 else 0.0
-        snare_amt = min(1.0, drum_transient * 1.5) if drum_transient > 0.08 else 0.0
-        hat_amt = min(1.0, h_norm * 1.2) if h_norm > 0.08 and (i % 2 == 0) else 0.0
-        lead_amt = min(1.0, m_norm * 1.15) if step_notes[i] is not None else 0.0
-        chord_amt = min(1.0, (m_norm + b_norm) * 0.8) if i % 4 == 0 else 0.0
-        arp_amt = min(1.0, (m_norm + h_norm) * 0.8) if i % 2 == 0 else 0.0
-        fx_amt = min(1.0, h_norm * 0.8) if i % 16 == 15 else 0.0
+        low_norm = max(0.0, min(1.0, step_low[i] / max_low))
+        mid_norm = max(0.0, min(1.0, step_mid[i] / max_mid))
+        high_norm = max(0.0, min(1.0, step_high[i] / max_high))
 
-        for j in range(start, end):
-            kick_gate[j] = kick_amt
-            snare_gate[j] = snare_amt
-            hat_gate[j] = hat_amt
-            lead_gate[j] = lead_amt
-            chord_gate[j] = chord_amt
-            arp_gate[j] = arp_amt
-            fx_gate[j] = fx_amt
+        kick_transient = max(0.0, low_norm - prev_low)
+        drum_transient = max(0.0, (mid_norm + high_norm) - prev_drum)
+        prev_low = low_norm
+        prev_drum = mid_norm + high_norm
+
+        kick_hit = kick_transient > 0.08
+        snare_hit = drum_transient > 0.12 and (i % 2 == 1)
+        hat_hit = high_norm > 0.18
+        fx_hit = i % 16 == 15 and high_norm > 0.08
+
+        if kick_hit:
+            _render_one_shot(stems_float["kick"], start, instruments["kick"], min(1.0, 0.55 + low_norm * 0.6))
+        if snare_hit:
+            _render_one_shot(stems_float["snare"], start, instruments["snare"], min(1.0, 0.45 + mid_norm * 0.55))
+        if hat_hit:
+            _render_one_shot(stems_float["hat"], start, instruments["hat"], min(1.0, 0.3 + high_norm * 0.5))
+
+        bass_note = bass_lane[i]
+        lead_note = lead_lane[i]
+        if bass_note is not None:
+            _render_wavetable_note(
+                stems_float["bass"],
+                start,
+                int(step_len * 1.5),
+                instruments["bass"],
+                _midi_to_hz(bass_note),
+                sample_rate,
+                min(0.8, 0.25 + low_norm * 0.4),
+            )
+
+        if lead_note is not None and i % 2 == 0:
+            _render_wavetable_note(
+                stems_float["lead"],
+                start,
+                int(step_len * 1.0),
+                instruments["lead"],
+                _midi_to_hz(lead_note),
+                sample_rate,
+                min(0.7, 0.2 + mid_norm * 0.35),
+            )
+            arp_note = lead_note + (12 if i % 4 == 0 else 7)
+            _render_wavetable_note(
+                stems_float["arp"],
+                start,
+                int(step_len * 0.8),
+                instruments["arp"],
+                _midi_to_hz(max(36, min(96, arp_note))),
+                sample_rate,
+                min(0.55, 0.15 + high_norm * 0.3),
+            )
+
+        chord_ref = lead_note if lead_note is not None else bass_note
+        if chord_ref is not None and i % 4 == 0:
+            root = max(36, chord_ref - (chord_ref % 12))
+            third = root + (3 if "minor" in key_name else 4)
+            fifth = root + 7
+            chord_len = int(step_len * 2.8)
+            _render_wavetable_note(stems_float["chord"], start, chord_len, instruments["chord"], _midi_to_hz(root), sample_rate, 0.15)
+            _render_wavetable_note(stems_float["chord"], start, chord_len, instruments["chord"], _midi_to_hz(third), sample_rate, 0.12)
+            _render_wavetable_note(stems_float["chord"], start, chord_len, instruments["chord"], _midi_to_hz(fifth), sample_rate, 0.12)
+
+        if fx_hit:
+            _render_wavetable_note(stems_float["fx"], start, int(step_len * 1.5), instruments["fx"], 900.0, sample_rate, 0.2)
 
         row_cells = ["--- 00 000" for _ in range(8)]
-        if kick_amt > 0:
-            row_cells[0] = _tracker_cell(36, kick_amt, "D01")
-        if snare_amt > 0:
-            row_cells[1] = _tracker_cell(38, snare_amt, "D02")
-        if hat_amt > 0:
-            row_cells[2] = _tracker_cell(42, hat_amt, "D03")
-        note = step_notes[i]
-        if note is not None:
-            row_cells[3] = _tracker_cell(max(24, note - 12), b_norm, "F10")
-            if arp_amt > 0:
-                row_cells[4] = _tracker_cell(note + (12 if i % 4 == 0 else 7), arp_amt, "047")
-            if chord_amt > 0:
-                row_cells[5] = _tracker_cell(note - (note % 12), chord_amt, "C40")
-            if lead_amt > 0:
-                row_cells[6] = _tracker_cell(note, lead_amt, "A03")
-        if fx_amt > 0:
-            row_cells[7] = _tracker_cell(84, fx_amt, "E9F")
+        if kick_hit:
+            row_cells[0] = _tracker_cell(36, min(1.0, 0.5 + low_norm), "D01")
+        if snare_hit:
+            row_cells[1] = _tracker_cell(38, min(1.0, 0.45 + mid_norm), "D02")
+        if hat_hit:
+            row_cells[2] = _tracker_cell(42, min(1.0, 0.35 + high_norm), "D03")
+        if bass_note is not None:
+            row_cells[3] = _tracker_cell(bass_note, low_norm, "F10")
+        if lead_note is not None and i % 2 == 0:
+            row_cells[4] = _tracker_cell(max(36, min(96, lead_note + (12 if i % 4 == 0 else 7))), high_norm, "047")
+            row_cells[6] = _tracker_cell(lead_note, mid_norm, "A03")
+        if chord_ref is not None and i % 4 == 0:
+            row_cells[5] = _tracker_cell(max(36, chord_ref - (chord_ref % 12)), (low_norm + mid_norm) * 0.5, "C40")
+        if fx_hit:
+            row_cells[7] = _tracker_cell(84, high_norm, "E9F")
         pattern_rows.append(row_cells)
-
-    stems_float = {name: array("f", [0.0]) * total_samples for name in ATARI_TRACK_NAMES}
-    for i in range(total_samples):
-        stems_float["kick"][i] = bass_band[i] * kick_gate[i] * 1.8
-        stems_float["snare"][i] = (mid_band[i] * 0.7 + high_band[i] * 0.6) * snare_gate[i] * 1.2
-        stems_float["hat"][i] = high_band[i] * hat_gate[i] * 1.1
-        stems_float["bass"][i] = bass_band[i] * 1.1
-        stems_float["arp"][i] = (mid_band[i] * 0.55 + high_band[i] * 0.35) * arp_gate[i] * 0.9
-        stems_float["chord"][i] = (lowmid_band[i] * 0.8 + mid_band[i] * 0.2) * chord_gate[i] * 0.95
-        stems_float["lead"][i] = mid_band[i] * lead_gate[i]
-        stems_float["fx"][i] = high_band[i] * fx_gate[i] * 0.85
 
     processed_stems = {}
     for name, data in stems_float.items():
-        degraded = _subsample_hold(data, hold=2)
-        degraded = _bitcrush(degraded, levels=48 if name in {"bass", "kick"} else 40, hold=2)
-        processed_stems[name] = _normalize(_soft_clip(degraded, drive=1.05), ceiling=0.86)
+        track = _bitcrush(_subsample_hold(data, hold=2), levels=42 if name in {"lead", "arp"} else 48, hold=2)
+        processed_stems[name] = _normalize(_soft_clip(track, drive=1.08), ceiling=0.86)
 
     mix = array("f", [0.0]) * total_samples
-    kick = processed_stems["kick"]
-    snare = processed_stems["snare"]
-    hat = processed_stems["hat"]
-    bass = processed_stems["bass"]
-    arp = processed_stems["arp"]
-    chord = processed_stems["chord"]
-    lead = processed_stems["lead"]
-    fx = processed_stems["fx"]
     for i in range(total_samples):
-        mix[i] = kick[i] + snare[i] + (hat[i] * 0.75) + bass[i] + arp[i] + chord[i] + lead[i] + (fx[i] * 0.5)
+        mix[i] = (
+            processed_stems["kick"][i]
+            + processed_stems["snare"][i]
+            + (processed_stems["hat"][i] * 0.75)
+            + processed_stems["bass"][i]
+            + processed_stems["arp"][i]
+            + processed_stems["chord"][i]
+            + processed_stems["lead"][i]
+            + (processed_stems["fx"][i] * 0.5)
+        )
 
-    mix = _normalize(_soft_clip(mix, drive=1.06), ceiling=0.9)
+    mix = _normalize(_soft_clip(mix, drive=1.1), ceiling=0.9)
     stems_wav = {name: _pcm16_wav_bytes(processed_stems[name], sample_rate) for name in ATARI_TRACK_NAMES}
 
     return {
