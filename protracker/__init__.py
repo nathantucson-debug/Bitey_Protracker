@@ -235,6 +235,39 @@ def _wav_audio_format(file_bytes: bytes) -> int:
     return 0
 
 
+def _decode_mono_frame(frame: bytes, channels: int, sample_width: int, is_float32: bool) -> float:
+    vals = []
+    if sample_width == 1:
+        for ch in range(channels):
+            vals.append((frame[ch] - 128) / 128.0)
+    elif sample_width == 2:
+        for ch in range(channels):
+            start = ch * 2
+            v = int.from_bytes(frame[start : start + 2], "little", signed=True) / 32768.0
+            vals.append(v)
+    elif sample_width == 3:
+        for ch in range(channels):
+            start = ch * 3
+            b0 = frame[start]
+            b1 = frame[start + 1]
+            b2 = frame[start + 2]
+            value = b0 | (b1 << 8) | (b2 << 16)
+            if value & 0x800000:
+                value -= 0x1000000
+            vals.append(value / 8388608.0)
+    elif sample_width == 4:
+        for ch in range(channels):
+            start = ch * 4
+            chunk = frame[start : start + 4]
+            if is_float32:
+                vals.append(struct.unpack("<f", chunk)[0])
+            else:
+                vals.append(int.from_bytes(chunk, "little", signed=True) / 2147483648.0)
+    else:
+        return 0.0
+    return max(-1.0, min(1.0, sum(vals) / max(1, len(vals))))
+
+
 def _read_wav_mono(file_bytes: bytes) -> tuple[list[float], int]:
     audio_format = _wav_audio_format(file_bytes)
     try:
@@ -310,6 +343,56 @@ def _read_wav_mono(file_bytes: bytes) -> tuple[list[float], int]:
         raise ValueError("WAV file has no audio samples")
 
     return mono, sample_rate
+
+
+def _extract_analysis_from_wav(file_bytes: bytes, target_rate: int = 11025, max_seconds: int = 180) -> tuple[list[float], int]:
+    audio_format = _wav_audio_format(file_bytes)
+    try:
+        with wave.open(io.BytesIO(file_bytes), "rb") as wf:
+            channels = wf.getnchannels()
+            sample_width = wf.getsampwidth()
+            sample_rate = wf.getframerate()
+            n_frames = wf.getnframes()
+            if channels < 1 or sample_rate <= 0:
+                raise ValueError("Invalid WAV format")
+
+            if sample_width not in (1, 2, 3, 4):
+                raise ValueError("Only 8-bit, 16-bit, 24-bit, or 32-bit WAV files are supported")
+            if sample_width == 4 and audio_format not in (1, 3):
+                raise ValueError("Unsupported 32-bit WAV encoding")
+
+            max_frames = min(n_frames, max_seconds * sample_rate)
+            duration_seconds = max(10, min(max_seconds, int(round(max_frames / sample_rate))))
+            is_float32 = audio_format == 3
+            ratio = sample_rate / max(1, target_rate)
+            next_pick = 0.0
+            src_index = 0
+            analysis = []
+            frame_size = channels * sample_width
+
+            while src_index < max_frames:
+                to_read = min(4096, max_frames - src_index)
+                raw = wf.readframes(to_read)
+                if not raw:
+                    break
+                frames_in_chunk = len(raw) // frame_size
+                for i in range(frames_in_chunk):
+                    if src_index + i >= max_frames:
+                        break
+                    if (src_index + i) < int(next_pick):
+                        continue
+                    start = i * frame_size
+                    frame = raw[start : start + frame_size]
+                    analysis.append(_decode_mono_frame(frame, channels, sample_width, is_float32))
+                    next_pick += ratio
+                src_index += frames_in_chunk
+    except wave.Error as exc:
+        raise ValueError(f"Invalid WAV file: {exc}") from exc
+
+    if not analysis:
+        raise ValueError("WAV file has no audio samples")
+
+    return analysis, duration_seconds
 
 
 def _rms(block: list[float]) -> float:
@@ -560,14 +643,10 @@ def _add_kick(buffer: list[float], start_sample: int, sample_rate: int, amp: flo
 
 
 def _build_atari_remix_from_wav(file_bytes: bytes, source_name: str) -> dict:
-    src_samples, src_rate = _read_wav_mono(file_bytes)
-    duration_seconds = max(1, int(round(len(src_samples) / src_rate)))
-    duration_seconds = max(10, min(180, duration_seconds))
-
     analysis_rate = 11025
-    analysis_samples = _resample_linear(src_samples, src_rate, analysis_rate)
-    if len(analysis_samples) > analysis_rate * 1200:
-        analysis_samples = analysis_samples[: analysis_rate * 1200]
+    analysis_samples, duration_seconds = _extract_analysis_from_wav(
+        file_bytes=file_bytes, target_rate=analysis_rate, max_seconds=180
+    )
 
     key_name, root_note = _estimate_key(analysis_samples, analysis_rate)
     energies, onsets, fps = _energy_and_onsets(analysis_samples, analysis_rate)

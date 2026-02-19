@@ -435,7 +435,7 @@
         const res = await fetch(`/api/atari/job/${jobId}`);
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
-          throw new Error(data.error || "Build job failed");
+          throw new Error(data.error || `Build job failed (${res.status})`);
         }
         if (data.status === "ready") {
           return data;
