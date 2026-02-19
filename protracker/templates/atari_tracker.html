@@ -6,15 +6,16 @@
   <title>BITEY PROTRACKER</title>
   <style>
     :root {
-      --bg: #8e8e8e;
-      --panel: #a0a0a0;
-      --panel-hi: #cfcfcf;
-      --panel-lo: #616161;
-      --screen: #040404;
-      --ink: #0c0c0c;
-      --green: #14d114;
-      --green-dim: #0b7f0b;
-      --amber: #e0c83f;
+      --bg: #9b9b9b;
+      --panel: #a8a8a8;
+      --panel-hi: #d8d8d8;
+      --panel-lo: #5e5e5e;
+      --screen: #050505;
+      --ink: #111111;
+      --green: #28d228;
+      --green-dim: #0f7f0f;
+      --amber: #ffe15a;
+      --blue: #5b83ff;
       --danger: #b02323;
       --font: "Lucida Console", "Monaco", "Courier New", monospace;
     }
@@ -22,7 +23,7 @@
     body {
       margin: 0;
       font-family: var(--font);
-      background: #868686;
+      background: #7f7f7f;
       color: var(--ink);
       min-height: 100vh;
       display: grid;
@@ -31,8 +32,8 @@
     }
     .tracker {
       width: min(980px, 100%);
-      border: 2px solid #dedede;
-      box-shadow: inset 1px 1px 0 #ffffff, inset -1px -1px 0 #5f5f5f;
+      border: 3px solid #d9d9d9;
+      box-shadow: inset 2px 2px 0 #f7f7f7, inset -2px -2px 0 #575757;
       background: var(--bg);
       overflow: hidden;
     }
@@ -42,19 +43,19 @@
       align-items: center;
       gap: 8px;
       padding: 6px 8px;
-      border-bottom: 2px solid #8e8e8e;
-      background: #a7a7a7;
+      border-bottom: 3px solid #878787;
+      background: #a3a3a3;
       font-weight: 700;
       letter-spacing: 0;
-      font-size: 16px;
+      font-size: 15px;
     }
     .brand { text-transform: uppercase; }
     .clock {
-      font-size: 14px;
-      background: #a1a1a1;
+      font-size: 13px;
+      background: #9a9a9a;
       padding: 2px 8px;
       border: 2px solid;
-      border-color: #d8d8d8 #6b6b6b #6b6b6b #d8d8d8;
+      border-color: #dcdcdc #5e5e5e #5e5e5e #dcdcdc;
       min-width: 110px;
       text-align: center;
     }
@@ -63,14 +64,14 @@
       grid-template-columns: 250px 1fr;
       gap: 6px;
       padding: 6px;
-      border-bottom: 2px solid #888;
+      border-bottom: 3px solid #878787;
     }
     .leftctl, .rightctl {
       background: var(--panel);
-      border: 2px solid;
+      border: 3px solid;
       border-color: var(--panel-hi) var(--panel-lo) var(--panel-lo) var(--panel-hi);
       padding: 6px;
-      min-height: 250px;
+      min-height: 260px;
     }
     .ctl-row {
       display: grid;
@@ -78,22 +79,22 @@
       align-items: center;
       gap: 6px;
       margin-bottom: 6px;
-      font-size: 17px;
+      font-size: 16px;
       font-weight: 700;
       text-transform: uppercase;
     }
     .ctl-row small { font-size: 14px; }
     .value-box {
       background: #9f9f9f;
-      border: 2px solid;
-      border-color: #dadada #6a6a6a #6a6a6a #dadada;
+      border: 3px solid;
+      border-color: #dcdcdc #5f5f5f #5f5f5f #dcdcdc;
       text-align: right;
       padding: 1px 6px;
       letter-spacing: 0;
     }
     .file-wrap {
       margin-top: 8px;
-      border-top: 2px solid #898989;
+      border-top: 3px solid #898989;
       padding-top: 8px;
       font-size: 14px;
       font-weight: 700;
@@ -119,8 +120,8 @@
       font: inherit;
       font-size: 16px;
       padding: 2px 4px;
-      border: 2px solid;
-      border-color: #dadada #6a6a6a #6a6a6a #dadada;
+      border: 3px solid;
+      border-color: #dcdcdc #5f5f5f #5f5f5f #dcdcdc;
       background: #b6b6b6;
     }
     .btnrow {
@@ -134,8 +135,8 @@
       font-size: 15px;
       font-weight: 700;
       text-transform: uppercase;
-      border: 2px solid;
-      border-color: #dfdfdf #5f5f5f #5f5f5f #dfdfdf;
+      border: 3px solid;
+      border-color: #e0e0e0 #575757 #575757 #e0e0e0;
       background: #a8a8a8;
       color: #111;
       padding: 5px 6px;
@@ -146,8 +147,8 @@
     button:active, .btn:active {
       border-color: #5f5f5f #dfdfdf #dfdfdf #5f5f5f;
     }
-    .primary { background: #a4c7a4; }
-    .warn { background: #c8b88a; }
+    .primary { background: #b8b8b8; }
+    .warn { background: #b6b6b6; }
     .status {
       margin-top: 8px;
       min-height: 20px;
@@ -167,8 +168,8 @@
     .scope {
       height: 96px;
       background: var(--screen);
-      border: 2px solid;
-      border-color: #5e5e5e #d0d0d0 #d0d0d0 #5e5e5e;
+      border: 3px solid;
+      border-color: #575757 #d0d0d0 #d0d0d0 #575757;
       position: relative;
       overflow: hidden;
     }
@@ -177,8 +178,8 @@
       position: absolute;
       inset: 0;
       background:
-        linear-gradient(transparent 49%, rgba(16,209,16,.12) 50%, transparent 51%),
-        linear-gradient(90deg, transparent 49%, rgba(16,209,16,.08) 50%, transparent 51%);
+        linear-gradient(transparent 49%, rgba(51,96,255,.18) 50%, transparent 51%),
+        linear-gradient(90deg, transparent 49%, rgba(51,96,255,.1) 50%, transparent 51%);
       background-size: 100% 18px, 28px 100%;
     }
     .scope canvas {
@@ -196,7 +197,7 @@
     .tele {
       background: #040404;
       color: var(--green);
-      border: 2px solid #6f6f6f;
+      border: 3px solid #666;
       padding: 2px 3px;
       font-size: 13px;
       font-weight: 700;
@@ -209,8 +210,8 @@
     }
     .meta {
       background: #9f9f9f;
-      border: 2px solid;
-      border-color: #dadada #6a6a6a #6a6a6a #dadada;
+      border: 3px solid;
+      border-color: #dcdcdc #5f5f5f #5f5f5f #dcdcdc;
       padding: 3px;
       font-size: 13px;
       font-weight: 700;
@@ -222,13 +223,13 @@
       margin-top: 2px;
       background: #000;
       color: var(--green);
-      border: 2px solid #6f6f6f;
+      border: 3px solid #666;
       padding: 1px 4px;
       min-width: 70px;
     }
 
     .tracker-grid-wrap {
-      border-top: 2px solid #868686;
+      border-top: 3px solid #868686;
       padding: 6px;
       background: #9b9b9b;
     }
@@ -239,8 +240,8 @@
       margin-bottom: 6px;
     }
     .ch {
-      border: 2px solid;
-      border-color: #dadada #666 #666 #dadada;
+      border: 3px solid;
+      border-color: #dcdcdc #5d5d5d #5d5d5d #dcdcdc;
       background: #9f9f9f;
       padding: 4px;
       display: grid;
@@ -253,13 +254,13 @@
       text-transform: uppercase;
       width: 100%;
       text-align: center;
-      border-bottom: 2px solid #858585;
+      border-bottom: 3px solid #858585;
       padding-bottom: 2px;
     }
     .vu {
       width: 100%;
       height: 92px;
-      border: 2px solid #7a7a7a;
+      border: 3px solid #737373;
       background: #030303;
       position: relative;
       overflow: hidden;
@@ -270,7 +271,7 @@
       right: 0;
       bottom: 0;
       height: 0%;
-      background: linear-gradient(0deg, #0da50d 0%, #15ea15 70%, #d7ce2f 100%);
+      background: linear-gradient(0deg, #0f930f 0%, #20db20 70%, #ffe15a 100%);
     }
     .db { font-size: 16px; font-weight: 700; text-transform: uppercase; }
     input[type="range"].fader {
@@ -285,9 +286,9 @@
 
     .pattern {
       background: #040404;
-      border: 2px solid;
-      border-color: #666 #ddd #ddd #666;
-      color: var(--green);
+      border: 3px solid;
+      border-color: #555 #d8d8d8 #d8d8d8 #555;
+      color: var(--blue);
       min-height: 230px;
       font-size: 16px;
       line-height: 1.1;
@@ -304,11 +305,11 @@
       margin-bottom: 2px;
       transition: transform .04s linear;
     }
-    .pattern .idx { color: #14a114; }
-    .pattern .col { color: #14d114; }
+    .pattern .idx { color: #8fb5ff; }
+    .pattern .col { color: var(--blue); }
     .pattern .col.active { color: var(--amber); }
     .pattern .line.hot .idx { color: var(--amber); }
-    .pattern .line.hot { transform: translateX(2px); }
+    .pattern .line.hot { transform: translateX(1px); background: rgba(120, 140, 210, 0.22); }
 
     .note {
       padding: 0 6px 6px;
