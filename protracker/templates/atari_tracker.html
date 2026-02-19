@@ -6,23 +6,23 @@
   <title>BITEY PROTRACKER</title>
   <style>
     :root {
-      --bg: #9b9b9b;
-      --panel: #a8a8a8;
-      --panel-hi: #c7c7c7;
-      --panel-lo: #6f6f6f;
+      --bg: #8e8e8e;
+      --panel: #a0a0a0;
+      --panel-hi: #cfcfcf;
+      --panel-lo: #616161;
       --screen: #040404;
       --ink: #0c0c0c;
       --green: #14d114;
       --green-dim: #0b7f0b;
       --amber: #e0c83f;
       --danger: #b02323;
-      --font: "Courier New", "Lucida Console", monospace;
+      --font: "Lucida Console", "Monaco", "Courier New", monospace;
     }
     * { box-sizing: border-box; }
     body {
       margin: 0;
       font-family: var(--font);
-      background: #7d7d7d;
+      background: #868686;
       color: var(--ink);
       min-height: 100vh;
       display: grid;
@@ -32,10 +32,7 @@
     .tracker {
       width: min(980px, 100%);
       border: 2px solid #dedede;
-      box-shadow:
-        inset 1px 1px 0 #ffffff,
-        inset -1px -1px 0 #5f5f5f,
-        0 8px 18px rgba(0,0,0,.25);
+      box-shadow: inset 1px 1px 0 #ffffff, inset -1px -1px 0 #5f5f5f;
       background: var(--bg);
       overflow: hidden;
     }
@@ -46,14 +43,14 @@
       gap: 8px;
       padding: 6px 8px;
       border-bottom: 2px solid #8e8e8e;
-      background: linear-gradient(#b7b7b7, #9d9d9d);
+      background: #a7a7a7;
       font-weight: 700;
-      letter-spacing: 1px;
-      font-size: 20px;
+      letter-spacing: 0;
+      font-size: 16px;
     }
     .brand { text-transform: uppercase; }
     .clock {
-      font-size: 18px;
+      font-size: 14px;
       background: #a1a1a1;
       padding: 2px 8px;
       border: 2px solid;
@@ -81,31 +78,31 @@
       align-items: center;
       gap: 6px;
       margin-bottom: 6px;
-      font-size: 28px;
+      font-size: 17px;
       font-weight: 700;
       text-transform: uppercase;
     }
-    .ctl-row small { font-size: 20px; }
+    .ctl-row small { font-size: 14px; }
     .value-box {
       background: #9f9f9f;
       border: 2px solid;
       border-color: #dadada #6a6a6a #6a6a6a #dadada;
       text-align: right;
       padding: 1px 6px;
-      letter-spacing: 1px;
+      letter-spacing: 0;
     }
     .file-wrap {
       margin-top: 8px;
       border-top: 2px solid #898989;
       padding-top: 8px;
-      font-size: 20px;
+      font-size: 14px;
       font-weight: 700;
     }
     .file-wrap input[type="file"] {
       width: 100%;
       margin-top: 6px;
       font: inherit;
-      font-size: 18px;
+      font-size: 13px;
     }
     .master-row {
       margin-top: 8px;
@@ -113,14 +110,14 @@
       grid-template-columns: 1fr 90px;
       gap: 6px;
       align-items: center;
-      font-size: 24px;
+      font-size: 16px;
       font-weight: 700;
       text-transform: uppercase;
     }
     #master-gain {
       width: 100%;
       font: inherit;
-      font-size: 24px;
+      font-size: 16px;
       padding: 2px 4px;
       border: 2px solid;
       border-color: #dadada #6a6a6a #6a6a6a #dadada;
@@ -134,7 +131,7 @@
     }
     button, .btn {
       font: inherit;
-      font-size: 22px;
+      font-size: 15px;
       font-weight: 700;
       text-transform: uppercase;
       border: 2px solid;
@@ -153,8 +150,8 @@
     .warn { background: #c8b88a; }
     .status {
       margin-top: 8px;
-      min-height: 28px;
-      font-size: 24px;
+      min-height: 20px;
+      font-size: 14px;
       font-weight: 700;
       color: #111;
     }
@@ -200,8 +197,8 @@
       background: #040404;
       color: var(--green);
       border: 2px solid #6f6f6f;
-      padding: 3px 4px;
-      font-size: 18px;
+      padding: 2px 3px;
+      font-size: 13px;
       font-weight: 700;
       text-transform: uppercase;
     }
@@ -214,8 +211,8 @@
       background: #9f9f9f;
       border: 2px solid;
       border-color: #dadada #6a6a6a #6a6a6a #dadada;
-      padding: 4px;
-      font-size: 18px;
+      padding: 3px;
+      font-size: 13px;
       font-weight: 700;
       min-height: 62px;
     }
@@ -223,7 +220,7 @@
     .meta span {
       display: inline-block;
       margin-top: 2px;
-      background: #040404;
+      background: #000;
       color: var(--green);
       border: 2px solid #6f6f6f;
       padding: 1px 4px;
@@ -291,13 +288,13 @@
       border: 2px solid;
       border-color: #666 #ddd #ddd #666;
       color: var(--green);
-      min-height: 190px;
-      font-size: 28px;
+      min-height: 230px;
+      font-size: 16px;
       line-height: 1.1;
       padding: 6px;
       overflow: hidden;
       font-weight: 700;
-      letter-spacing: 1px;
+      letter-spacing: 0;
       text-transform: uppercase;
     }
     .pattern .line {
