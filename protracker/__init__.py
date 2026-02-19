@@ -4,6 +4,7 @@ import json
 import math
 import os
 import random
+import struct
 import threading
 import time
 import uuid
@@ -102,8 +103,8 @@ def _start_atari_job(file_bytes: bytes, source_name: str) -> str:
             _set_job_status(job_id, {"status": "ready", "result": result})
         except ValueError as exc:
             _set_job_status(job_id, {"status": "failed", "error": str(exc)})
-        except Exception:
-            _set_job_status(job_id, {"status": "failed", "error": "Build failed on server. Try a shorter PCM WAV file."})
+        except Exception as exc:
+            _set_job_status(job_id, {"status": "failed", "error": f"Build failed on server: {exc.__class__.__name__}"})
 
     threading.Thread(target=worker, daemon=True).start()
     return job_id
@@ -219,7 +220,23 @@ def _resample_linear(samples: list[float], src_rate: int, dst_rate: int) -> list
     return out
 
 
+def _wav_audio_format(file_bytes: bytes) -> int:
+    if len(file_bytes) < 44 or file_bytes[:4] != b"RIFF" or file_bytes[8:12] != b"WAVE":
+        return 0
+    idx = 12
+    size = len(file_bytes)
+    while idx + 8 <= size:
+        chunk_id = file_bytes[idx : idx + 4]
+        chunk_size = int.from_bytes(file_bytes[idx + 4 : idx + 8], "little", signed=False)
+        data_start = idx + 8
+        if chunk_id == b"fmt " and data_start + 2 <= size:
+            return int.from_bytes(file_bytes[data_start : data_start + 2], "little", signed=False)
+        idx = data_start + chunk_size + (chunk_size % 2)
+    return 0
+
+
 def _read_wav_mono(file_bytes: bytes) -> tuple[list[float], int]:
+    audio_format = _wav_audio_format(file_bytes)
     try:
         with wave.open(io.BytesIO(file_bytes), "rb") as wf:
             channels = wf.getnchannels()
@@ -269,8 +286,25 @@ def _read_wav_mono(file_bytes: bytes) -> tuple[list[float], int]:
                     value -= 0x1000000
                 vals.append(value / 8388608.0)
             mono.append(max(-1.0, min(1.0, sum(vals) / len(vals))))
+    elif sample_width == 4:
+        frame_width = channels * 4
+        mono = []
+        is_float = audio_format == 3
+        for i in range(0, len(raw), frame_width):
+            frame = raw[i : i + frame_width]
+            if len(frame) < frame_width:
+                break
+            vals = []
+            for ch in range(channels):
+                chunk = frame[ch * 4 : ch * 4 + 4]
+                if is_float:
+                    value = struct.unpack("<f", chunk)[0]
+                else:
+                    value = int.from_bytes(chunk, "little", signed=True) / 2147483648.0
+                vals.append(value)
+            mono.append(max(-1.0, min(1.0, sum(vals) / len(vals))))
     else:
-        raise ValueError("Only 8-bit, 16-bit, or 24-bit PCM WAV files are supported")
+        raise ValueError("Only 8-bit, 16-bit, 24-bit, or 32-bit WAV files are supported")
 
     if not mono:
         raise ValueError("WAV file has no audio samples")
