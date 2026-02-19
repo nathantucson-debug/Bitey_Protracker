@@ -189,6 +189,31 @@ def _normalize(samples: list[float], ceiling: float = 0.92) -> list[float]:
     return samples
 
 
+def _to_arrayf(samples: list[float]) -> array:
+    out = array("f")
+    out.extend(float(x) for x in samples)
+    return out
+
+
+def _soft_clip(samples: list[float], drive: float = 1.0) -> array:
+    out = array("f", [0.0]) * len(samples)
+    for i in range(len(samples)):
+        out[i] = math.tanh(samples[i] * drive)
+    return out
+
+
+def _subsample_hold(samples: list[float], hold: int = 2) -> array:
+    if hold <= 1:
+        return _to_arrayf(samples)
+    out = array("f", [0.0]) * len(samples)
+    held = 0.0
+    for i in range(len(samples)):
+        if i % hold == 0:
+            held = samples[i]
+        out[i] = held
+    return out
+
+
 def _pcm16_wav_bytes(samples: list[float], sample_rate: int) -> bytes:
     int_samples = array("h")
     int_samples.extend(int(max(-1.0, min(1.0, s)) * 32767.0) for s in samples)
@@ -647,96 +672,62 @@ def _build_atari_remix_from_wav(file_bytes: bytes, source_name: str) -> dict:
     analysis_samples, duration_seconds = _extract_analysis_from_wav(
         file_bytes=file_bytes, target_rate=analysis_rate, max_seconds=180
     )
-    if len(analysis_samples) > analysis_rate * 45:
-        analysis_samples = analysis_samples[: analysis_rate * 45]
-
-    key_name, root_note = _estimate_key(analysis_samples, analysis_rate)
     energies, onsets, fps = _energy_and_onsets(analysis_samples, analysis_rate)
-    envelope = _compress_range(energies)
     tempo_map_bpm, avg_bpm = _estimate_tempo_map(onsets, fps, duration_seconds)
+    key_name, _ = _estimate_key(analysis_samples[: analysis_rate * 30], analysis_rate)
 
     source_id = hashlib.sha256(file_bytes).hexdigest()[:16]
-    rng = random.Random(int(hashlib.sha256((source_id + key_name).encode("utf-8")).hexdigest()[:12], 16))
+    sample_rate = 8000 if duration_seconds >= 120 else 12000
+    render_samples = _resample_linear(analysis_samples, analysis_rate, sample_rate)
+    total_samples = len(render_samples)
 
-    if duration_seconds >= 150:
-        sample_rate = 4000
-        mode_level = 2
-    elif duration_seconds >= 120:
-        sample_rate = 5000
-        mode_level = 1
-    elif duration_seconds >= 90:
-        sample_rate = 7000
-        mode_level = 1
-    else:
-        sample_rate = 12000
-        mode_level = 0
-    total_samples = duration_seconds * sample_rate
-    step_starts = _build_step_starts(total_samples, sample_rate, tempo_map_bpm)
-    progression_minor = [0, 3, 7, 10, 7, 5, 3, 0]
-    progression_major = [0, 4, 7, 11, 7, 5, 4, 0]
-    progression = progression_major if "major" in key_name else progression_minor
+    src = _to_arrayf(render_samples)
+    low_a = _simple_lowpass(src, alpha=0.03)
+    low_b = _simple_lowpass(src, alpha=0.008)
+    high = array("f", [0.0]) * total_samples
+    mid = array("f", [0.0]) * total_samples
+    for i in range(total_samples):
+        high[i] = src[i] - low_a[i]
+        mid[i] = low_a[i] - low_b[i]
+
+    transient = array("f", [0.0]) * total_samples
+    prev = 0.0
+    for i in range(total_samples):
+        d = abs(src[i] - prev)
+        prev = src[i]
+        transient[i] = min(1.0, d * 10.0)
 
     stems_float = {name: array("f", [0.0]) * total_samples for name in ATARI_TRACK_NAMES}
-
-    for step_idx, start in enumerate(step_starts):
-        step_in_bar = step_idx % 16
-        bar_idx = step_idx // 16
-        dyn = _sample_envelope(envelope, start * analysis_rate // max(1, sample_rate), len(analysis_samples))
-        chord_root = root_note + progression[(bar_idx // 2) % len(progression)]
-        density_gate = 0.55 if mode_level >= 2 else (0.72 if mode_level >= 1 else 1.0)
-
-        if step_in_bar in (0, 8) or (dyn > 0.55 and step_in_bar == 12 and rng.random() < 0.3):
-            _add_kick(stems_float["kick"], start, sample_rate, 0.48 + dyn * 0.5)
-        if step_in_bar in (4, 12) and dyn > 0.18 and rng.random() <= density_gate:
-            _add_noise_hit(stems_float["snare"], start, int(sample_rate * 0.16), 0.35 + dyn * 0.33, rng, decay=5.2)
-            _add_tone(stems_float["snare"], start, int(sample_rate * 0.1), sample_rate, 190.0, 0.12, "triangle", rng)
-
-        if step_in_bar % 2 == 0 and dyn > 0.12 and (mode_level == 0 or step_in_bar % 4 == 0):
-            _add_noise_hit(stems_float["hat"], start, int(sample_rate * 0.045), 0.13 + dyn * 0.2, rng, decay=7.5)
-
-        if step_in_bar in (0, 3, 8, 11) and dyn > 0.1:
-            bass_note = chord_root - 12 + (0 if step_in_bar in (0, 8) else 7)
-            _add_tone(stems_float["bass"], start, int(sample_rate * 0.16), sample_rate, _midi_to_hz(bass_note), 0.22 + dyn * 0.24, "square", rng)
-
-        if mode_level <= 1 and step_in_bar % 2 == 0 and dyn > 0.22 and rng.random() <= density_gate:
-            arp_offsets = [0, 7, 12, 7]
-            arp_note = chord_root + arp_offsets[(step_in_bar // 2) % len(arp_offsets)] + 12
-            _add_tone(stems_float["arp"], start, int(sample_rate * 0.11), sample_rate, _midi_to_hz(arp_note), 0.08 + dyn * 0.14, "square", rng)
-
-        if mode_level <= 1 and step_in_bar in (0, 8) and dyn > 0.28 and rng.random() <= density_gate:
-            for n in (0, 3 if "minor" in key_name else 4, 7):
-                _add_tone(stems_float["chord"], start, int(sample_rate * (0.36 if mode_level >= 1 else 0.62)), sample_rate, _midi_to_hz(chord_root + n + 12), 0.05 + dyn * 0.08, "triangle", rng)
-
-        if mode_level == 0 and step_in_bar in (2, 6, 10, 14) and dyn > 0.34 and rng.random() <= density_gate:
-            melody_offsets = [12, 10, 7, 14, 15, 12, 19, 17]
-            note = chord_root + melody_offsets[(bar_idx + step_in_bar) % len(melody_offsets)]
-            _add_tone(stems_float["lead"], start, int(sample_rate * 0.2), sample_rate, _midi_to_hz(note), 0.08 + dyn * 0.14, "saw", rng)
-
-        if step_in_bar == 15 and dyn > 0.42:
-            _add_noise_hit(stems_float["fx"], start, int(sample_rate * 0.2), 0.12 + dyn * 0.13, rng, decay=2.4)
+    for i in range(total_samples):
+        t = transient[i]
+        stems_float["kick"][i] = low_b[i] * (0.6 + 0.9 * t)
+        stems_float["snare"][i] = mid[i] * (0.35 + 1.1 * t)
+        stems_float["hat"][i] = high[i] * (0.25 + 1.4 * t)
+        stems_float["bass"][i] = low_a[i] * (0.95 - 0.45 * t)
+        stems_float["arp"][i] = high[i] * 0.45
+        stems_float["chord"][i] = mid[i] * 0.95
+        stems_float["lead"][i] = high[i] * 0.7 + mid[i] * 0.2
+        stems_float["fx"][i] = (src[i] - (low_b[i] + mid[i] + high[i])) * 0.6
 
     processed_stems = {}
     for name, data in stems_float.items():
-        low = _simple_lowpass(data, alpha=0.17 if name in {"lead", "arp", "hat"} else 0.24)
-        crushed = _bitcrush(low, levels=34 if name in {"lead", "arp", "bass"} else 42, hold=2)
-        processed_stems[name] = _normalize(crushed, ceiling=0.88)
+        tone = _simple_lowpass(data, alpha=0.22 if name in {"bass", "kick"} else 0.16)
+        hold = 3 if sample_rate <= 8000 else 2
+        crushed = _bitcrush(_subsample_hold(tone, hold=hold), levels=30 if name in {"lead", "arp"} else 36, hold=2)
+        processed_stems[name] = _normalize(_soft_clip(crushed, drive=1.25), ceiling=0.86)
 
     mix = array("f", [0.0]) * total_samples
     for name in ATARI_TRACK_NAMES:
         weight = 1.0
         if name == "hat":
-            weight = 0.8
+            weight = 0.7
         if name == "fx":
-            weight = 0.72
+            weight = 0.45
         track = processed_stems[name]
         for i in range(total_samples):
             mix[i] += track[i] * weight
 
-    mix = _simple_lowpass(mix, alpha=0.21)
-    for i in range(total_samples):
-        mix[i] = math.tanh(mix[i] * 1.15)
-    mix = _normalize(mix, ceiling=0.9)
-
+    mix = _normalize(_soft_clip(_simple_lowpass(mix, alpha=0.2), drive=1.2), ceiling=0.9)
     stems_wav = {name: _pcm16_wav_bytes(processed_stems[name], sample_rate) for name in ATARI_TRACK_NAMES}
 
     return {
