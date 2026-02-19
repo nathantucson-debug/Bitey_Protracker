@@ -814,13 +814,13 @@ def _add_kick(buffer: list[float], start_sample: int, sample_rate: int, amp: flo
 
 def _build_atari_remix_from_wav(file_bytes: bytes, source_name: str) -> dict:
     source_samples, source_rate = _read_wav_mono(file_bytes)
-    max_seconds = 240
+    max_seconds = 150
     max_src_samples = max_seconds * source_rate
     if len(source_samples) > max_src_samples:
-        raise ValueError("Source WAV is too long for this Render tier (max 240s)")
+        raise ValueError("Source WAV is too long for this Render tier (max 150s)")
 
     source_id = hashlib.sha256(file_bytes).hexdigest()[:16]
-    sample_rate = 16000
+    sample_rate = 12000
     mono = _resample_linear(source_samples, source_rate, sample_rate) if source_rate != sample_rate else source_samples[:]
     if not mono:
         raise ValueError("No audio content found after decoding")
@@ -1003,26 +1003,21 @@ def _build_atari_remix_from_wav(file_bytes: bytes, source_name: str) -> dict:
             row_cells[7] = _tracker_cell(84, high_norm, "E9F")
         pattern_rows.append(row_cells)
 
-    processed_stems = {}
+    mix = array("f", [0.0]) * total_samples
+    stems_wav: dict[str, bytes] = {}
     for name, data in stems_float.items():
         track = _bitcrush(_subsample_hold(data, hold=2), levels=42 if name in {"lead", "arp"} else 48, hold=2)
-        processed_stems[name] = _normalize(_soft_clip(track, drive=1.08), ceiling=0.86)
-
-    mix = array("f", [0.0]) * total_samples
-    for i in range(total_samples):
-        mix[i] = (
-            processed_stems["kick"][i]
-            + processed_stems["snare"][i]
-            + (processed_stems["hat"][i] * 0.75)
-            + processed_stems["bass"][i]
-            + processed_stems["arp"][i]
-            + processed_stems["chord"][i]
-            + processed_stems["lead"][i]
-            + (processed_stems["fx"][i] * 0.5)
-        )
+        track = _normalize(_soft_clip(track, drive=1.08), ceiling=0.86)
+        stems_wav[name] = _pcm16_wav_bytes(track, sample_rate)
+        weight = 1.0
+        if name == "hat":
+            weight = 0.75
+        if name == "fx":
+            weight = 0.5
+        for i in range(total_samples):
+            mix[i] += track[i] * weight
 
     mix = _normalize(_soft_clip(mix, drive=1.1), ceiling=0.9)
-    stems_wav = {name: _pcm16_wav_bytes(processed_stems[name], sample_rate) for name in ATARI_TRACK_NAMES}
 
     return {
         "source_id": source_id,
