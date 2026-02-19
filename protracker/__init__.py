@@ -2,6 +2,7 @@ import hashlib
 import io
 import json
 import math
+import os
 import random
 import threading
 import time
@@ -19,6 +20,7 @@ ATARI_TRACK_NAMES = ["kick", "snare", "hat", "bass", "arp", "chord", "lead", "fx
 ATARI_SESSION_TTL_SECONDS = 3600
 ATARI_SESSION_CACHE: dict[str, dict] = {}
 ATARI_SESSION_LOCK = threading.Lock()
+ATARI_SESSION_DIR = "/tmp/atari_sessions"
 
 
 def _midi_to_hz(midi_note: int) -> float:
@@ -30,15 +32,51 @@ def _cleanup_atari_sessions() -> None:
     with ATARI_SESSION_LOCK:
         stale_ids = [sid for sid, payload in ATARI_SESSION_CACHE.items() if payload.get("created_at", 0.0) < cutoff]
         for sid in stale_ids:
+            session = ATARI_SESSION_CACHE.get(sid) or {}
+            session_dir = session.get("session_dir")
+            if session_dir and os.path.isdir(session_dir):
+                for root, dirs, files in os.walk(session_dir, topdown=False):
+                    for name in files:
+                        try:
+                            os.remove(os.path.join(root, name))
+                        except OSError:
+                            pass
+                    for name in dirs:
+                        try:
+                            os.rmdir(os.path.join(root, name))
+                        except OSError:
+                            pass
+                try:
+                    os.rmdir(session_dir)
+                except OSError:
+                    pass
             ATARI_SESSION_CACHE.pop(sid, None)
 
 
 def _create_atari_session(remix: dict, source_name: str) -> str:
     _cleanup_atari_sessions()
     session_id = uuid.uuid4().hex
+    os.makedirs(ATARI_SESSION_DIR, exist_ok=True)
+    session_dir = os.path.join(ATARI_SESSION_DIR, session_id)
+    os.makedirs(session_dir, exist_ok=True)
+    stems_dir = os.path.join(session_dir, "stems")
+    os.makedirs(stems_dir, exist_ok=True)
+
+    mix_path = os.path.join(session_dir, "mix.wav")
+    with open(mix_path, "wb") as f:
+        f.write(remix["mix_wav"])
+
+    stem_paths: dict[str, str] = {}
+    for stem_name, stem_bytes in remix["stems_wav"].items():
+        path = os.path.join(stems_dir, f"{stem_name}.wav")
+        with open(path, "wb") as f:
+            f.write(stem_bytes)
+        stem_paths[stem_name] = path
+
     payload = {
         "id": session_id,
         "created_at": time.time(),
+        "session_dir": session_dir,
         "source_name": source_name,
         "source_id": remix["source_id"],
         "bpm": remix["bpm"],
@@ -46,8 +84,8 @@ def _create_atari_session(remix: dict, source_name: str) -> str:
         "duration_seconds": remix["duration_seconds"],
         "estimated_key": remix["estimated_key"],
         "tempo_map_bpm": remix["tempo_map_bpm"],
-        "mix_wav": remix["mix_wav"],
-        "stems_wav": remix["stems_wav"],
+        "mix_path": mix_path,
+        "stem_paths": stem_paths,
     }
     with ATARI_SESSION_LOCK:
         ATARI_SESSION_CACHE[session_id] = payload
@@ -60,10 +98,10 @@ def _get_atari_session(session_id: str) -> dict | None:
         return ATARI_SESSION_CACHE.get(session_id)
 
 
-def _simple_lowpass(samples: list[float], alpha: float = 0.22) -> list[float]:
+def _simple_lowpass(samples: list[float], alpha: float = 0.22) -> array:
     if not samples:
-        return samples
-    out = [0.0] * len(samples)
+        return array("f")
+    out = array("f", [0.0]) * len(samples)
     prev = 0.0
     for i, sample in enumerate(samples):
         prev = prev + alpha * (sample - prev)
@@ -71,10 +109,10 @@ def _simple_lowpass(samples: list[float], alpha: float = 0.22) -> list[float]:
     return out
 
 
-def _bitcrush(samples: list[float], levels: int = 40, hold: int = 2) -> list[float]:
+def _bitcrush(samples: list[float], levels: int = 40, hold: int = 2) -> array:
     if not samples:
-        return samples
-    out = [0.0] * len(samples)
+        return array("f")
+    out = array("f", [0.0]) * len(samples)
     held = 0.0
     for i, sample in enumerate(samples):
         if i % max(1, hold) == 0:
@@ -89,13 +127,14 @@ def _normalize(samples: list[float], ceiling: float = 0.92) -> list[float]:
         return samples
     if peak > ceiling:
         scale = ceiling / peak
-        return [s * scale for s in samples]
+        for i in range(len(samples)):
+            samples[i] = samples[i] * scale
     return samples
 
 
 def _pcm16_wav_bytes(samples: list[float], sample_rate: int) -> bytes:
-    clipped = [max(-1.0, min(1.0, x)) for x in samples]
-    int_samples = array("h", (int(s * 32767.0) for s in clipped))
+    int_samples = array("h")
+    int_samples.extend(int(max(-1.0, min(1.0, s)) * 32767.0) for s in samples)
     with io.BytesIO() as buf:
         with wave.open(buf, "wb") as wav_file:
             wav_file.setnchannels(1)
@@ -416,7 +455,7 @@ def _add_kick(buffer: list[float], start_sample: int, sample_rate: int, amp: flo
 def _build_atari_remix_from_wav(file_bytes: bytes, source_name: str) -> dict:
     src_samples, src_rate = _read_wav_mono(file_bytes)
     duration_seconds = max(1, int(round(len(src_samples) / src_rate)))
-    duration_seconds = max(10, min(1200, duration_seconds))
+    duration_seconds = max(10, min(360, duration_seconds))
 
     analysis_rate = 11025
     analysis_samples = _resample_linear(src_samples, src_rate, analysis_rate)
@@ -431,14 +470,14 @@ def _build_atari_remix_from_wav(file_bytes: bytes, source_name: str) -> dict:
     source_id = hashlib.sha256(file_bytes).hexdigest()[:16]
     rng = random.Random(int(hashlib.sha256((source_id + key_name).encode("utf-8")).hexdigest()[:12], 16))
 
-    sample_rate = 16000
+    sample_rate = 12000
     total_samples = duration_seconds * sample_rate
     step_starts = _build_step_starts(total_samples, sample_rate, tempo_map_bpm)
     progression_minor = [0, 3, 7, 10, 7, 5, 3, 0]
     progression_major = [0, 4, 7, 11, 7, 5, 4, 0]
     progression = progression_major if "major" in key_name else progression_minor
 
-    stems_float = {name: [0.0] * total_samples for name in ATARI_TRACK_NAMES}
+    stems_float = {name: array("f", [0.0]) * total_samples for name in ATARI_TRACK_NAMES}
 
     for step_idx, start in enumerate(step_starts):
         step_in_bar = step_idx % 16
@@ -482,18 +521,20 @@ def _build_atari_remix_from_wav(file_bytes: bytes, source_name: str) -> dict:
         crushed = _bitcrush(low, levels=34 if name in {"lead", "arp", "bass"} else 42, hold=2)
         processed_stems[name] = _normalize(crushed, ceiling=0.88)
 
-    mix = [0.0] * total_samples
+    mix = array("f", [0.0]) * total_samples
     for name in ATARI_TRACK_NAMES:
         weight = 1.0
         if name == "hat":
             weight = 0.8
         if name == "fx":
             weight = 0.72
-        for i, sample in enumerate(processed_stems[name]):
-            mix[i] += sample * weight
+        track = processed_stems[name]
+        for i in range(total_samples):
+            mix[i] += track[i] * weight
 
     mix = _simple_lowpass(mix, alpha=0.21)
-    mix = [math.tanh(sample * 1.15) for sample in mix]
+    for i in range(total_samples):
+        mix[i] = math.tanh(mix[i] * 1.15)
     mix = _normalize(mix, ceiling=0.9)
 
     stems_wav = {name: _pcm16_wav_bytes(processed_stems[name], sample_rate) for name in ATARI_TRACK_NAMES}
@@ -557,11 +598,12 @@ def atari_session_mix(session_id: str):
     if not session:
         return jsonify({"error": "session not found or expired"}), 404
     filename = f"atari-mix-{session['source_id']}.wav"
-    return Response(
-        session["mix_wav"],
-        mimetype="audio/wav",
-        headers={"Content-Disposition": f'inline; filename="{filename}"', "X-Atari-BPM": str(session["bpm"])},
-    )
+    try:
+        with open(session["mix_path"], "rb") as f:
+            payload = f.read()
+    except OSError:
+        return jsonify({"error": "session file missing"}), 410
+    return Response(payload, mimetype="audio/wav", headers={"Content-Disposition": f'inline; filename="{filename}"', "X-Atari-BPM": str(session["bpm"])})
 
 
 @protracker_bp.get("/api/atari/session/<session_id>/stem/<stem_name>.wav")
@@ -572,11 +614,13 @@ def atari_session_stem(session_id: str, stem_name: str):
     if stem_name not in ATARI_TRACK_NAMES:
         return jsonify({"error": "unknown stem"}), 404
     filename = f"atari-stem-{stem_name}-{session['source_id']}.wav"
-    return Response(
-        session["stems_wav"][stem_name],
-        mimetype="audio/wav",
-        headers={"Content-Disposition": f'inline; filename="{filename}"'},
-    )
+    path = (session.get("stem_paths") or {}).get(stem_name, "")
+    try:
+        with open(path, "rb") as f:
+            payload = f.read()
+    except OSError:
+        return jsonify({"error": "session file missing"}), 410
+    return Response(payload, mimetype="audio/wav", headers={"Content-Disposition": f'inline; filename="{filename}"'})
 
 
 @protracker_bp.post("/api/atari/session/<session_id>/export")
@@ -589,7 +633,11 @@ def atari_session_export(session_id: str):
     file_prefix = f"atari8track-{session['source_id']}-{stamp}"
     with io.BytesIO() as zip_buf:
         with zipfile.ZipFile(zip_buf, "w", compression=zipfile.ZIP_DEFLATED) as zf:
-            zf.writestr(f"{file_prefix}/mix.wav", session["mix_wav"])
+            try:
+                with open(session["mix_path"], "rb") as f:
+                    zf.writestr(f"{file_prefix}/mix.wav", f.read())
+            except OSError:
+                return jsonify({"error": "session file missing"}), 410
             manifest = {
                 "source_name": session["source_name"],
                 "source_id": session["source_id"],
@@ -603,7 +651,12 @@ def atari_session_export(session_id: str):
             }
             zf.writestr(f"{file_prefix}/session.json", json.dumps(manifest, indent=2))
             for stem_name in ATARI_TRACK_NAMES:
-                zf.writestr(f"{file_prefix}/stems/{stem_name}.wav", session["stems_wav"][stem_name])
+                path = (session.get("stem_paths") or {}).get(stem_name, "")
+                try:
+                    with open(path, "rb") as f:
+                        zf.writestr(f"{file_prefix}/stems/{stem_name}.wav", f.read())
+                except OSError:
+                    return jsonify({"error": "session file missing"}), 410
         zip_bytes = zip_buf.getvalue()
     return Response(
         zip_bytes,
