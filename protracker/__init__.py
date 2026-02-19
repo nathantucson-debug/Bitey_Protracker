@@ -121,7 +121,11 @@ def _start_atari_job(file_bytes: bytes, source_name: str) -> str:
         except ValueError as exc:
             _set_job_status(job_id, {"status": "failed", "error": str(exc)})
         except Exception as exc:
-            _set_job_status(job_id, {"status": "failed", "error": f"Build failed on server: {exc.__class__.__name__}"})
+            detail = str(exc).strip()
+            if detail:
+                _set_job_status(job_id, {"status": "failed", "error": f"Build failed on server: {exc.__class__.__name__}: {detail}"})
+            else:
+                _set_job_status(job_id, {"status": "failed", "error": f"Build failed on server: {exc.__class__.__name__}"})
 
     threading.Thread(target=worker, daemon=True).start()
     return job_id
@@ -811,7 +815,7 @@ def _add_kick(buffer: list[float], start_sample: int, sample_rate: int, amp: flo
 def _build_atari_remix_from_wav(file_bytes: bytes, source_name: str) -> dict:
     analysis_rate = 8000
     analysis_samples, duration_seconds = _extract_analysis_from_wav(
-        file_bytes=file_bytes, target_rate=analysis_rate, max_seconds=180
+        file_bytes=file_bytes, target_rate=analysis_rate, max_seconds=90
     )
     energies, onsets, fps = _energy_and_onsets(analysis_samples, analysis_rate)
     tempo_map_bpm, avg_bpm = _estimate_tempo_map(onsets, fps, duration_seconds)
@@ -825,8 +829,8 @@ def _build_atari_remix_from_wav(file_bytes: bytes, source_name: str) -> dict:
     instruments = _make_tracker_instruments(sample_rate)
     stems_float = {name: array("f", [0.0]) * total_samples for name in ATARI_TRACK_NAMES}
 
-    frame = 1024
-    hop = 512
+    frame = 768
+    hop = 384
     step_pitches: list[list[int]] = [[] for _ in range(len(step_starts))]
     kick_strength = [0.0 for _ in range(len(step_starts))]
     snare_strength = [0.0 for _ in range(len(step_starts))]
@@ -922,9 +926,8 @@ def _build_atari_remix_from_wav(file_bytes: bytes, source_name: str) -> dict:
 
     processed_stems = {}
     for name, data in stems_float.items():
-        tone = _simple_lowpass(data, alpha=0.2 if name in {"bass", "kick"} else 0.14)
-        crushed = _bitcrush(_subsample_hold(tone, hold=2 if sample_rate >= 12000 else 3), levels=30 if name in {"lead", "arp"} else 36, hold=2)
-        processed_stems[name] = _normalize(_soft_clip(crushed, drive=1.18), ceiling=0.86)
+        # Keep post processing minimal to avoid OOM on low-memory free-tier instances.
+        processed_stems[name] = _normalize(_soft_clip(data, drive=1.08), ceiling=0.86)
 
     mix = array("f", [0.0]) * total_samples
     kick = processed_stems["kick"]
