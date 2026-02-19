@@ -402,10 +402,10 @@ def _rms(block: list[float]) -> float:
 
 
 def _estimate_pitch_class_hist(samples: list[float], sample_rate: int) -> list[float]:
-    frame = 2048
-    hop = 1024
-    lag_min = max(16, int(sample_rate / 500))
-    lag_max = min(frame - 2, int(sample_rate / 70))
+    frame = 1024
+    hop = 2048
+    lag_min = max(12, int(sample_rate / 420))
+    lag_max = min(frame - 2, int(sample_rate / 80))
     hist = [0.0] * 12
     if len(samples) < frame:
         return hist
@@ -428,9 +428,9 @@ def _estimate_pitch_class_hist(samples: list[float], sample_rate: int) -> list[f
 
         best_lag = 0
         best_corr = -1e9
-        for lag in range(lag_min, lag_max):
+        for lag in range(lag_min, lag_max, 2):
             corr = 0.0
-            for i in range(frame - lag):
+            for i in range(0, frame - lag, 2):
                 corr += block[i] * block[i + lag]
             if corr > best_corr:
                 best_corr = corr
@@ -647,6 +647,8 @@ def _build_atari_remix_from_wav(file_bytes: bytes, source_name: str) -> dict:
     analysis_samples, duration_seconds = _extract_analysis_from_wav(
         file_bytes=file_bytes, target_rate=analysis_rate, max_seconds=180
     )
+    if len(analysis_samples) > analysis_rate * 45:
+        analysis_samples = analysis_samples[: analysis_rate * 45]
 
     key_name, root_note = _estimate_key(analysis_samples, analysis_rate)
     energies, onsets, fps = _energy_and_onsets(analysis_samples, analysis_rate)

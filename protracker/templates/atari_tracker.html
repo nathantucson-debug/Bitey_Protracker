@@ -368,7 +368,11 @@
 
     async function decodeStem(url) {
       const res = await fetch(url);
-      if (!res.ok) throw new Error("Failed to load stem");
+      if (!res.ok) {
+        let detail = "";
+        try { detail = await res.text(); } catch (_) {}
+        throw new Error(`Failed to load stem (${res.status}) ${url}${detail ? `: ${detail}` : ""}`);
+      }
       const buf = await res.arrayBuffer();
       return state.context.decodeAudioData(buf.slice(0));
     }
@@ -430,7 +434,7 @@
     }
 
     async function waitForJob(jobId) {
-      const maxPolls = 240;
+      const maxPolls = 720;
       for (let i = 0; i < maxPolls; i += 1) {
         const res = await fetch(`/api/atari/job/${jobId}`);
         const data = await res.json().catch(() => ({}));
