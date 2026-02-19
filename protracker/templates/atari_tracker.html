@@ -184,6 +184,27 @@
         linear-gradient(90deg, transparent 49%, rgba(16,209,16,.08) 50%, transparent 51%);
       background-size: 100% 18px, 28px 100%;
     }
+    .scope canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+    .telemetry {
+      margin-bottom: 6px;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+    }
+    .tele {
+      background: #040404;
+      color: var(--green);
+      border: 2px solid #6f6f6f;
+      padding: 3px 4px;
+      font-size: 18px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
     .meta-grid {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
@@ -199,6 +220,15 @@
       min-height: 62px;
     }
     .meta b { display: block; text-transform: uppercase; font-size: 16px; }
+    .meta span {
+      display: inline-block;
+      margin-top: 2px;
+      background: #040404;
+      color: var(--green);
+      border: 2px solid #6f6f6f;
+      padding: 1px 4px;
+      min-width: 70px;
+    }
 
     .tracker-grid-wrap {
       border-top: 2px solid #868686;
@@ -275,10 +305,13 @@
       grid-template-columns: 46px repeat(8, 1fr);
       gap: 6px;
       margin-bottom: 2px;
+      transition: transform .04s linear;
     }
     .pattern .idx { color: #14a114; }
     .pattern .col { color: #14d114; }
     .pattern .col.active { color: var(--amber); }
+    .pattern .line.hot .idx { color: var(--amber); }
+    .pattern .line.hot { transform: translateX(2px); }
 
     .note {
       padding: 0 6px 6px;
@@ -335,9 +368,15 @@
       </div>
 
       <div class="rightctl">
+        <div class="telemetry">
+          <div class="tele">SPD <span id="tele-spd">06</span></div>
+          <div class="tele">ROW <span id="tele-row">00</span></div>
+          <div class="tele">HZ <span id="tele-hz">00000</span></div>
+          <div class="tele">CPU <span id="tele-cpu">00</span></div>
+        </div>
         <div class="scope-line">
-          <div class="scope"></div>
-          <div class="scope"></div>
+          <div class="scope"><canvas id="scope-left"></canvas></div>
+          <div class="scope"><canvas id="scope-right"></canvas></div>
         </div>
         <div class="meta-grid">
           <div class="meta"><b>Source</b><span id="meta-source">-</span></div>
@@ -352,14 +391,7 @@
       <div class="channels" id="channels"></div>
 
       <div class="pattern" id="pattern-view">
-        <div class="line"><span class="idx">00</span><span class="col active">C-3 10 00</span><span class="col">---</span><span class="col">G-2 20 00</span><span class="col">---</span><span class="col">C-4 10 00</span><span class="col">---</span><span class="col">G-3 20 00</span><span class="col">---</span></div>
-        <div class="line"><span class="idx">01</span><span class="col">---</span><span class="col">---</span><span class="col">---</span><span class="col">---</span><span class="col">---</span><span class="col">---</span><span class="col">---</span><span class="col">---</span></div>
-        <div class="line"><span class="idx">02</span><span class="col">---</span><span class="col">---</span><span class="col">---</span><span class="col">---</span><span class="col">---</span><span class="col">---</span><span class="col">---</span><span class="col">---</span></div>
-        <div class="line"><span class="idx">03</span><span class="col">---</span><span class="col">---</span><span class="col">---</span><span class="col">---</span><span class="col">---</span><span class="col">---</span><span class="col">---</span><span class="col">---</span></div>
-        <div class="line"><span class="idx">04</span><span class="col active">C-3 10 00</span><span class="col">---</span><span class="col">G-2 20 00</span><span class="col">---</span><span class="col">C-4 10 00</span><span class="col">---</span><span class="col">G-3 20 00</span><span class="col">---</span></div>
-        <div class="line"><span class="idx">05</span><span class="col">---</span><span class="col">---</span><span class="col">---</span><span class="col">---</span><span class="col">---</span><span class="col">---</span><span class="col">---</span><span class="col">---</span></div>
-        <div class="line"><span class="idx">06</span><span class="col">---</span><span class="col">---</span><span class="col">---</span><span class="col">---</span><span class="col">---</span><span class="col">---</span><span class="col">---</span><span class="col">---</span></div>
-        <div class="line"><span class="idx">07</span><span class="col">---</span><span class="col">---</span><span class="col">---</span><span class="col">---</span><span class="col">---</span><span class="col">---</span><span class="col">---</span><span class="col">---</span></div>
+        <div class="line"><span class="idx">00</span><span class="col">---</span><span class="col">---</span><span class="col">---</span><span class="col">---</span><span class="col">---</span><span class="col">---</span><span class="col">---</span><span class="col">---</span></div>
       </div>
     </section>
 
@@ -400,9 +432,21 @@
       metaKey: document.getElementById("meta-key"),
       metaPos: document.getElementById("meta-pos"),
       metaJob: document.getElementById("meta-job"),
+      teleSpd: document.getElementById("tele-spd"),
+      teleRow: document.getElementById("tele-row"),
+      teleHz: document.getElementById("tele-hz"),
+      teleCpu: document.getElementById("tele-cpu"),
+      scopeLeft: document.getElementById("scope-left"),
+      scopeRight: document.getElementById("scope-right"),
+      pattern: document.getElementById("pattern-view"),
     };
 
     const vuElements = new Map();
+    const scopeBuffers = {
+      left: new Uint8Array(512),
+      right: new Uint8Array(512),
+    };
+    const patternRows = [];
 
     function setStatus(message, mode = "") {
       el.status.textContent = message;
@@ -435,6 +479,70 @@
       el.timeReadout.textContent = `${fmtTime(pos)} / ${fmtTime(state.duration)}`;
       const row = Math.min(63, Math.floor(pos * 4) % 64);
       el.metaPos.textContent = String(row).padStart(2, "0");
+      el.teleRow.textContent = String(row).padStart(2, "0");
+      el.teleHz.textContent = String(Math.max(0, Math.floor(state.context?.sampleRate || 0))).padStart(5, "0");
+      const cpu = state.isPlaying ? Math.min(99, 18 + ((row * 7) % 25)) : 0;
+      el.teleCpu.textContent = String(cpu).padStart(2, "0");
+      updatePatternRoll(row);
+    }
+
+    function trackerCell(track, row) {
+      const notes = ["C-", "D-", "E-", "F-", "G-", "A-", "B-"];
+      if ((row + track) % 4 !== 0) return "--- ----";
+      const n = notes[(row + track * 2) % notes.length];
+      const oct = 2 + ((row + track) % 3);
+      const fx = ((row * 17 + track * 9) % 255).toString(16).toUpperCase().padStart(2, "0");
+      return `${n}${oct} 10${fx}`;
+    }
+
+    function initPatternRoll() {
+      el.pattern.innerHTML = "";
+      patternRows.length = 0;
+      for (let row = 0; row < 32; row += 1) {
+        const line = document.createElement("div");
+        line.className = "line";
+        const idx = document.createElement("span");
+        idx.className = "idx";
+        idx.textContent = String(row).padStart(2, "0");
+        line.appendChild(idx);
+        for (let ch = 0; ch < 8; ch += 1) {
+          const col = document.createElement("span");
+          col.className = "col";
+          col.textContent = trackerCell(ch, row);
+          line.appendChild(col);
+        }
+        el.pattern.appendChild(line);
+        patternRows.push(line);
+      }
+    }
+
+    function updatePatternRoll(currentRow) {
+      for (let i = 0; i < patternRows.length; i += 1) {
+        patternRows[i].classList.toggle("hot", i === (currentRow % patternRows.length));
+      }
+    }
+
+    function drawScope(canvas, data, color = "#13d913") {
+      if (!canvas) return;
+      const w = canvas.clientWidth;
+      const h = canvas.clientHeight;
+      if (w <= 0 || h <= 0) return;
+      if (canvas.width !== w || canvas.height !== h) {
+        canvas.width = w;
+        canvas.height = h;
+      }
+      const ctx = canvas.getContext("2d");
+      ctx.clearRect(0, 0, w, h);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      for (let i = 0; i < data.length; i += 1) {
+        const x = (i / (data.length - 1)) * w;
+        const y = ((data[i] - 128) / 128) * (h * 0.42) + h * 0.5;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
     }
 
     function buildChannelUi() {
@@ -509,6 +617,17 @@
         const db = peak > 0.00001 ? (20 * Math.log10(peak)).toFixed(1) : "-inf";
         ui.dbEl.textContent = `${db.toUpperCase()} DB`;
       });
+
+      const leftAnalyser = state.analyserNodes.get(TRACKS[0]);
+      const rightAnalyser = state.analyserNodes.get(TRACKS[4]) || leftAnalyser;
+      if (leftAnalyser) {
+        leftAnalyser.getByteTimeDomainData(scopeBuffers.left);
+        drawScope(el.scopeLeft, scopeBuffers.left, "#13d913");
+      }
+      if (rightAnalyser) {
+        rightAnalyser.getByteTimeDomainData(scopeBuffers.right);
+        drawScope(el.scopeRight, scopeBuffers.right, "#13d913");
+      }
 
       updateTimeReadout();
       if (currentTimePosition() >= state.duration) {
@@ -647,6 +766,7 @@
 
         el.metaSource.textContent = data.source_name || "source.wav";
         el.metaBpm.textContent = String(data.bpm);
+        el.teleSpd.textContent = String(Math.max(1, Math.round((data.bpm || 120) / 20))).padStart(2, "0");
         el.metaDuration.textContent = `${data.duration_seconds}s`;
         el.metaKey.textContent = data.estimated_key || "-";
         el.metaJob.textContent = "READY";
@@ -700,6 +820,7 @@
     el.download.addEventListener("click", downloadSessionZip);
 
     buildChannelUi();
+    initPatternRoll();
     updateTimeReadout();
   </script>
 </body>
