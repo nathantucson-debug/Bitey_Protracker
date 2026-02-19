@@ -3,7 +3,6 @@ import io
 import json
 import math
 import random
-import re
 import threading
 import time
 import uuid
@@ -11,16 +10,12 @@ import wave
 import zipfile
 from array import array
 from datetime import datetime, timezone
-from urllib import parse, request
 
 from flask import Blueprint, Response, jsonify, render_template, request as flask_request
 
 protracker_bp = Blueprint("protracker", __name__, template_folder="templates")
 
-SPOTIFY_TRACK_RE = re.compile(r"^[A-Za-z0-9]{22}$")
 ATARI_TRACK_NAMES = ["kick", "snare", "hat", "bass", "arp", "chord", "lead", "fx"]
-ATARI_NOTE_POOL = [36, 38, 41, 43, 45, 48, 50, 53, 55, 57, 60, 62, 65, 67, 69, 72]
-ATARI_DURATION_RE = re.compile(r'"duration_ms"\s*:\s*(\d{4,8})')
 ATARI_SESSION_TTL_SECONDS = 3600
 ATARI_SESSION_CACHE: dict[str, dict] = {}
 ATARI_SESSION_LOCK = threading.Lock()
@@ -28,54 +23,6 @@ ATARI_SESSION_LOCK = threading.Lock()
 
 def _midi_to_hz(midi_note: int) -> float:
     return 440.0 * (2 ** ((midi_note - 69) / 12))
-
-
-def _extract_spotify_track_id(spotify_url: str) -> str:
-    value = (spotify_url or "").strip()
-    if not value:
-        return ""
-    if SPOTIFY_TRACK_RE.match(value):
-        return value
-    parsed = parse.urlparse(value)
-    if parsed.netloc not in {"open.spotify.com", "spotify.com"}:
-        return ""
-    path_parts = [part for part in parsed.path.split("/") if part]
-    if len(path_parts) >= 2 and path_parts[0] == "track" and SPOTIFY_TRACK_RE.match(path_parts[1]):
-        return path_parts[1]
-    if parsed.fragment:
-        frag = parsed.fragment.strip()
-        if frag.startswith("track:"):
-            candidate = frag.split(":", 1)[1]
-            if SPOTIFY_TRACK_RE.match(candidate):
-                return candidate
-    return ""
-
-
-def _fetch_spotify_duration_seconds(track_id: str) -> int | None:
-    track_url = f"https://open.spotify.com/track/{track_id}"
-    req = request.Request(
-        track_url,
-        headers={
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Safari/537.36",
-            "Accept-Language": "en-US,en;q=0.9",
-        },
-    )
-    try:
-        with request.urlopen(req, timeout=3) as resp:
-            body = resp.read().decode("utf-8", errors="ignore")
-    except Exception:
-        return None
-
-    matches = ATARI_DURATION_RE.findall(body)
-    if not matches:
-        return None
-    try:
-        duration_ms = int(matches[0])
-    except ValueError:
-        return None
-    if duration_ms < 20000:
-        return None
-    return max(20, min(1200, int(round(duration_ms / 1000.0))))
 
 
 def _cleanup_atari_sessions() -> None:
@@ -86,19 +33,19 @@ def _cleanup_atari_sessions() -> None:
             ATARI_SESSION_CACHE.pop(sid, None)
 
 
-def _create_atari_session(remix: dict, source_url: str, duration_input: int | None) -> str:
+def _create_atari_session(remix: dict, source_name: str) -> str:
     _cleanup_atari_sessions()
     session_id = uuid.uuid4().hex
     payload = {
         "id": session_id,
         "created_at": time.time(),
-        "source_url": source_url,
-        "duration_input": duration_input,
-        "track_id": remix["track_id"],
+        "source_name": source_name,
+        "source_id": remix["source_id"],
         "bpm": remix["bpm"],
         "sample_rate": remix["sample_rate"],
         "duration_seconds": remix["duration_seconds"],
-        "duration_source": remix["duration_source"],
+        "estimated_key": remix["estimated_key"],
+        "tempo_map_bpm": remix["tempo_map_bpm"],
         "mix_wav": remix["mix_wav"],
         "stems_wav": remix["stems_wav"],
     }
@@ -156,6 +103,247 @@ def _pcm16_wav_bytes(samples: list[float], sample_rate: int) -> bytes:
             wav_file.setframerate(sample_rate)
             wav_file.writeframes(int_samples.tobytes())
         return buf.getvalue()
+
+
+def _resample_linear(samples: list[float], src_rate: int, dst_rate: int) -> list[float]:
+    if not samples or src_rate <= 0 or dst_rate <= 0:
+        return samples
+    if src_rate == dst_rate:
+        return samples[:]
+    ratio = src_rate / dst_rate
+    dst_len = max(1, int(len(samples) * (dst_rate / src_rate)))
+    out = [0.0] * dst_len
+    for i in range(dst_len):
+        src_pos = i * ratio
+        idx = int(src_pos)
+        frac = src_pos - idx
+        if idx >= len(samples) - 1:
+            out[i] = samples[-1]
+        else:
+            out[i] = samples[idx] * (1.0 - frac) + samples[idx + 1] * frac
+    return out
+
+
+def _read_wav_mono(file_bytes: bytes) -> tuple[list[float], int]:
+    try:
+        with wave.open(io.BytesIO(file_bytes), "rb") as wf:
+            channels = wf.getnchannels()
+            sample_width = wf.getsampwidth()
+            sample_rate = wf.getframerate()
+            n_frames = wf.getnframes()
+            if channels < 1 or sample_rate <= 0:
+                raise ValueError("Invalid WAV format")
+            raw = wf.readframes(n_frames)
+    except wave.Error as exc:
+        raise ValueError(f"Invalid WAV file: {exc}") from exc
+
+    if sample_width == 2:
+        data = array("h")
+        data.frombytes(raw)
+        scale = 32768.0
+        if channels == 1:
+            mono = [max(-1.0, min(1.0, x / scale)) for x in data]
+        else:
+            mono = []
+            for i in range(0, len(data), channels):
+                frame = data[i : i + channels]
+                mono.append(max(-1.0, min(1.0, (sum(frame) / len(frame)) / scale)))
+    elif sample_width == 1:
+        if channels == 1:
+            mono = [((x - 128) / 128.0) for x in raw]
+        else:
+            mono = []
+            for i in range(0, len(raw), channels):
+                frame = raw[i : i + channels]
+                avg = (sum(frame) / len(frame) - 128.0) / 128.0
+                mono.append(max(-1.0, min(1.0, avg)))
+    else:
+        raise ValueError("Only 8-bit and 16-bit PCM WAV files are supported")
+
+    if not mono:
+        raise ValueError("WAV file has no audio samples")
+
+    return mono, sample_rate
+
+
+def _rms(block: list[float]) -> float:
+    if not block:
+        return 0.0
+    return math.sqrt(sum(x * x for x in block) / len(block))
+
+
+def _estimate_pitch_class_hist(samples: list[float], sample_rate: int) -> list[float]:
+    frame = 2048
+    hop = 1024
+    lag_min = max(16, int(sample_rate / 500))
+    lag_max = min(frame - 2, int(sample_rate / 70))
+    hist = [0.0] * 12
+    if len(samples) < frame:
+        return hist
+
+    for start in range(0, len(samples) - frame, hop):
+        block = samples[start : start + frame]
+        energy = _rms(block)
+        if energy < 0.02:
+            continue
+
+        zc = 0
+        prev = block[0]
+        for x in block[1:]:
+            if (prev <= 0 < x) or (prev >= 0 > x):
+                zc += 1
+            prev = x
+        zcr = zc / len(block)
+        if zcr > 0.22:
+            continue
+
+        best_lag = 0
+        best_corr = -1e9
+        for lag in range(lag_min, lag_max):
+            corr = 0.0
+            for i in range(frame - lag):
+                corr += block[i] * block[i + lag]
+            if corr > best_corr:
+                best_corr = corr
+                best_lag = lag
+
+        if best_lag <= 0:
+            continue
+
+        freq = sample_rate / best_lag
+        if freq < 70 or freq > 500:
+            continue
+
+        midi = int(round(69 + 12 * math.log2(freq / 440.0)))
+        hist[midi % 12] += energy
+
+    return hist
+
+
+def _estimate_key(samples: list[float], sample_rate: int) -> tuple[str, int]:
+    pitch_names = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
+    hist = _estimate_pitch_class_hist(samples, sample_rate)
+    if max(hist, default=0.0) <= 0:
+        return "A minor", 57
+
+    root_class = max(range(12), key=lambda i: hist[i])
+    major_third = hist[(root_class + 4) % 12]
+    minor_third = hist[(root_class + 3) % 12]
+    is_major = major_third >= minor_third
+    mode = "major" if is_major else "minor"
+
+    root_midi = 48 + root_class
+    while root_midi < 40:
+        root_midi += 12
+    while root_midi > 64:
+        root_midi -= 12
+
+    return f"{pitch_names[root_class]} {mode}", root_midi
+
+
+def _energy_and_onsets(samples: list[float], sample_rate: int) -> tuple[list[float], list[float], float]:
+    frame = 1024
+    hop = 512
+    if len(samples) < frame:
+        e = [_rms(samples)]
+        return e, [0.0], sample_rate / hop
+
+    energies = []
+    for start in range(0, len(samples) - frame, hop):
+        energies.append(_rms(samples[start : start + frame]))
+
+    smooth = _simple_lowpass(energies, alpha=0.35)
+    onsets = [0.0] * len(smooth)
+    for i in range(1, len(smooth)):
+        d = smooth[i] - smooth[i - 1]
+        onsets[i] = d if d > 0 else 0.0
+
+    frames_per_second = sample_rate / hop
+    return smooth, onsets, frames_per_second
+
+
+def _estimate_tempo_map(onsets: list[float], fps: float, duration_seconds: int) -> tuple[list[float], float]:
+    if not onsets or fps <= 0:
+        return [120.0], 120.0
+
+    seg_seconds = 8
+    seg_frames = max(8, int(seg_seconds * fps))
+    bpm_map = []
+    min_lag = max(2, int((60.0 / 180.0) * fps))
+    max_lag = min(int((60.0 / 70.0) * fps), max(3, seg_frames - 1))
+
+    for seg_start in range(0, len(onsets), seg_frames):
+        seg = onsets[seg_start : seg_start + seg_frames]
+        if len(seg) < min_lag + 2:
+            continue
+        seg_mean = sum(seg) / max(1, len(seg))
+        seg = [x - seg_mean for x in seg]
+
+        best_lag = 0
+        best_score = -1e9
+        for lag in range(min_lag, max_lag):
+            score = 0.0
+            limit = len(seg) - lag
+            if limit <= 0:
+                break
+            for i in range(limit):
+                score += seg[i] * seg[i + lag]
+            if score > best_score:
+                best_score = score
+                best_lag = lag
+
+        if best_lag > 0:
+            bpm_map.append(60.0 * fps / best_lag)
+
+    if not bpm_map:
+        bpm_map = [120.0]
+
+    bpm_map = [max(70.0, min(180.0, b)) for b in bpm_map]
+    avg_bpm = sum(bpm_map) / len(bpm_map)
+
+    target_segments = max(1, int(math.ceil(duration_seconds / 8.0)))
+    if len(bpm_map) < target_segments:
+        last = bpm_map[-1]
+        bpm_map.extend([last] * (target_segments - len(bpm_map)))
+    elif len(bpm_map) > target_segments:
+        bpm_map = bpm_map[:target_segments]
+
+    return bpm_map, avg_bpm
+
+
+def _build_step_starts(total_samples: int, sample_rate: int, bpm_map: list[float]) -> list[int]:
+    starts = []
+    t = 0
+    segments = max(1, len(bpm_map))
+    while t < total_samples:
+        starts.append(t)
+        pos = t / max(1, total_samples)
+        seg_idx = min(segments - 1, int(pos * segments))
+        bpm = max(70.0, min(180.0, bpm_map[seg_idx]))
+        step = int((60.0 / bpm) / 4.0 * sample_rate)
+        t += max(8, step)
+        if len(starts) > 10000:
+            break
+    return starts
+
+
+def _sample_envelope(envelope: list[float], sample_index: int, total_samples: int) -> float:
+    if not envelope:
+        return 0.5
+    pos = sample_index / max(1, total_samples)
+    idx = min(len(envelope) - 1, int(pos * len(envelope)))
+    v = envelope[idx]
+    return max(0.0, min(1.0, v))
+
+
+def _compress_range(values: list[float]) -> list[float]:
+    if not values:
+        return values
+    lo = min(values)
+    hi = max(values)
+    if hi - lo < 1e-9:
+        return [0.5 for _ in values]
+    return [(v - lo) / (hi - lo) for v in values]
 
 
 def _add_tone(
@@ -225,141 +413,74 @@ def _add_kick(buffer: list[float], start_sample: int, sample_rate: int, amp: flo
         buffer[idx] += (math.sin(2 * math.pi * phase) + click) * amp * env
 
 
-def _build_atari_remix(spotify_url: str, duration_seconds: int | None = None) -> dict:
-    track_id = _extract_spotify_track_id(spotify_url)
-    if not track_id:
-        raise ValueError("Invalid Spotify track URL. Use a link like https://open.spotify.com/track/...")
+def _build_atari_remix_from_wav(file_bytes: bytes, source_name: str) -> dict:
+    src_samples, src_rate = _read_wav_mono(file_bytes)
+    duration_seconds = max(1, int(round(len(src_samples) / src_rate)))
+    duration_seconds = max(10, min(1200, duration_seconds))
 
-    seed_int = int(hashlib.sha256(track_id.encode("utf-8")).hexdigest()[:12], 16)
-    rng = random.Random(seed_int)
+    analysis_rate = 11025
+    analysis_samples = _resample_linear(src_samples, src_rate, analysis_rate)
+    if len(analysis_samples) > analysis_rate * 1200:
+        analysis_samples = analysis_samples[: analysis_rate * 1200]
+
+    key_name, root_note = _estimate_key(analysis_samples, analysis_rate)
+    energies, onsets, fps = _energy_and_onsets(analysis_samples, analysis_rate)
+    envelope = _compress_range(energies)
+    tempo_map_bpm, avg_bpm = _estimate_tempo_map(onsets, fps, duration_seconds)
+
+    source_id = hashlib.sha256(file_bytes).hexdigest()[:16]
+    rng = random.Random(int(hashlib.sha256((source_id + key_name).encode("utf-8")).hexdigest()[:12], 16))
 
     sample_rate = 16000
-    bpm = rng.randint(90, 136)
-    step_samples = int((60.0 / bpm) / 4.0 * sample_rate)
-    if duration_seconds is not None:
-        seconds_target = max(20, min(1200, int(duration_seconds)))
-        duration_source = "user"
-    else:
-        spotify_duration = _fetch_spotify_duration_seconds(track_id)
-        if spotify_duration is not None:
-            seconds_target = spotify_duration
-            duration_source = "spotify"
-        else:
-            seconds_target = 180
-            duration_source = "fallback"
+    total_samples = duration_seconds * sample_rate
+    step_starts = _build_step_starts(total_samples, sample_rate, tempo_map_bpm)
+    progression_minor = [0, 3, 7, 10, 7, 5, 3, 0]
+    progression_major = [0, 4, 7, 11, 7, 5, 4, 0]
+    progression = progression_major if "major" in key_name else progression_minor
 
-    total_steps = max(64, int(math.ceil((seconds_target * sample_rate) / max(1, step_samples))))
-    total_samples = total_steps * step_samples
-    duration_seconds_rendered = int(round(total_samples / sample_rate))
-    cell_steps = min(total_steps, 16 * 16)
-    cell_samples = cell_steps * step_samples
+    stems_float = {name: [0.0] * total_samples for name in ATARI_TRACK_NAMES}
 
-    root_idx = seed_int % len(ATARI_NOTE_POOL)
-    root_note = ATARI_NOTE_POOL[root_idx]
-    progression = [0, 5, 7, 3, 0, 8, 5, 7]
-    stems_cell = {name: [0.0] * cell_samples for name in ATARI_TRACK_NAMES}
+    for step_idx, start in enumerate(step_starts):
+        step_in_bar = step_idx % 16
+        bar_idx = step_idx // 16
+        dyn = _sample_envelope(envelope, start * analysis_rate // max(1, sample_rate), len(analysis_samples))
+        chord_root = root_note + progression[(bar_idx // 2) % len(progression)]
 
-    for step in range(cell_steps):
-        step_in_bar = step % 16
-        bar_idx = step // 16
-        section_idx = (bar_idx // 8) % 4
-        chord_root = root_note + progression[bar_idx % len(progression)]
-        start = step * step_samples
+        if step_in_bar in (0, 8) or (dyn > 0.55 and step_in_bar == 12 and rng.random() < 0.3):
+            _add_kick(stems_float["kick"], start, sample_rate, 0.48 + dyn * 0.5)
+        if step_in_bar in (4, 12) and dyn > 0.18:
+            _add_noise_hit(stems_float["snare"], start, int(sample_rate * 0.16), 0.35 + dyn * 0.33, rng, decay=5.2)
+            _add_tone(stems_float["snare"], start, int(sample_rate * 0.1), sample_rate, 190.0, 0.12, "triangle", rng)
 
-        is_intro = section_idx == 0
-        is_break = section_idx == 2
+        if step_in_bar % 2 == 0 and dyn > 0.12:
+            _add_noise_hit(stems_float["hat"], start, int(sample_rate * 0.045), 0.13 + dyn * 0.2, rng, decay=7.5)
 
-        if step_in_bar in (0, 8) or (step_in_bar == 12 and rng.random() < 0.26):
-            _add_kick(stems_cell["kick"], start, sample_rate, 0.85)
-        if not is_intro and step_in_bar in (4,) and rng.random() < 0.3:
-            _add_kick(stems_cell["kick"], start, sample_rate, 0.45)
-
-        if step_in_bar in (4, 12) or (step_in_bar == 15 and rng.random() < 0.15):
-            _add_noise_hit(stems_cell["snare"], start, int(sample_rate * 0.18), 0.55, rng, decay=5.2)
-            _add_tone(
-                stems_cell["snare"],
-                start,
-                int(sample_rate * 0.14),
-                sample_rate,
-                190.0,
-                0.18,
-                "triangle",
-                rng,
-            )
-
-        if step_in_bar % 2 == 0 and not (is_break and step_in_bar in (0, 8)):
-            hat_amp = 0.22 if step_in_bar not in (14,) else 0.3
-            _add_noise_hit(stems_cell["hat"], start, int(sample_rate * 0.05), hat_amp, rng, decay=7.5)
-
-        if step_in_bar in (0, 3, 8, 11) and not (is_intro and step_in_bar == 3):
+        if step_in_bar in (0, 3, 8, 11) and dyn > 0.1:
             bass_note = chord_root - 12 + (0 if step_in_bar in (0, 8) else 7)
-            _add_tone(
-                stems_cell["bass"],
-                start,
-                int(step_samples * 1.6),
-                sample_rate,
-                _midi_to_hz(bass_note),
-                0.35,
-                "square",
-                rng,
-            )
+            _add_tone(stems_float["bass"], start, int(sample_rate * 0.16), sample_rate, _midi_to_hz(bass_note), 0.22 + dyn * 0.24, "square", rng)
 
-        if step_in_bar % 2 == 0 and not is_break:
+        if step_in_bar % 2 == 0 and dyn > 0.22:
             arp_offsets = [0, 7, 12, 7]
-            arp_note = chord_root + arp_offsets[(step_in_bar // 2) % len(arp_offsets)]
-            _add_tone(
-                stems_cell["arp"],
-                start,
-                int(step_samples * 0.9),
-                sample_rate,
-                _midi_to_hz(arp_note + 12),
-                0.17,
-                "square",
-                rng,
-            )
+            arp_note = chord_root + arp_offsets[(step_in_bar // 2) % len(arp_offsets)] + 12
+            _add_tone(stems_float["arp"], start, int(sample_rate * 0.11), sample_rate, _midi_to_hz(arp_note), 0.08 + dyn * 0.14, "square", rng)
 
-        if step_in_bar in (0, 8) and not (is_intro and step_in_bar == 8):
-            chord_stack = [0, 4, 7]
-            for n in chord_stack:
-                _add_tone(
-                    stems_cell["chord"],
-                    start,
-                    int(step_samples * 7.2),
-                    sample_rate,
-                    _midi_to_hz(chord_root + n + 12),
-                    0.09,
-                    "triangle",
-                    rng,
-                )
+        if step_in_bar in (0, 8) and dyn > 0.28:
+            for n in (0, 3 if "minor" in key_name else 4, 7):
+                _add_tone(stems_float["chord"], start, int(sample_rate * 0.62), sample_rate, _midi_to_hz(chord_root + n + 12), 0.05 + dyn * 0.08, "triangle", rng)
 
-        if step_in_bar in (2, 6, 10, 14) and not is_intro:
+        if step_in_bar in (2, 6, 10, 14) and dyn > 0.34:
             melody_offsets = [12, 10, 7, 14, 15, 12, 19, 17]
             note = chord_root + melody_offsets[(bar_idx + step_in_bar) % len(melody_offsets)]
-            _add_tone(
-                stems_cell["lead"],
-                start,
-                int(step_samples * 1.2),
-                sample_rate,
-                _midi_to_hz(note),
-                0.18,
-                "saw",
-                rng,
-            )
+            _add_tone(stems_float["lead"], start, int(sample_rate * 0.2), sample_rate, _midi_to_hz(note), 0.08 + dyn * 0.14, "saw", rng)
 
-        if step_in_bar == 15 and bar_idx % 4 == 3:
-            _add_noise_hit(stems_cell["fx"], start, int(sample_rate * 0.22), 0.27, rng, decay=2.0)
-
-    processed_cell = {}
-    for name, data in stems_cell.items():
-        low = _simple_lowpass(data, alpha=0.17 if name in {"lead", "arp", "hat"} else 0.24)
-        crushed = _bitcrush(low, levels=36 if name in {"lead", "arp", "bass"} else 42, hold=2)
-        processed_cell[name] = _normalize(crushed, ceiling=0.88)
+        if step_in_bar == 15 and dyn > 0.42:
+            _add_noise_hit(stems_float["fx"], start, int(sample_rate * 0.2), 0.12 + dyn * 0.13, rng, decay=2.4)
 
     processed_stems = {}
-    for name, cell_data in processed_cell.items():
-        repeats = int(math.ceil(total_samples / max(1, len(cell_data))))
-        tiled = (cell_data * repeats)[:total_samples]
-        processed_stems[name] = tiled
+    for name, data in stems_float.items():
+        low = _simple_lowpass(data, alpha=0.17 if name in {"lead", "arp", "hat"} else 0.24)
+        crushed = _bitcrush(low, levels=34 if name in {"lead", "arp", "bass"} else 42, hold=2)
+        processed_stems[name] = _normalize(crushed, ceiling=0.88)
 
     mix = [0.0] * total_samples
     for name in ATARI_TRACK_NAMES:
@@ -367,32 +488,26 @@ def _build_atari_remix(spotify_url: str, duration_seconds: int | None = None) ->
         if name == "hat":
             weight = 0.8
         if name == "fx":
-            weight = 0.75
+            weight = 0.72
         for i, sample in enumerate(processed_stems[name]):
             mix[i] += sample * weight
 
     mix = _simple_lowpass(mix, alpha=0.21)
     mix = [math.tanh(sample * 1.15) for sample in mix]
     mix = _normalize(mix, ceiling=0.9)
+
     stems_wav = {name: _pcm16_wav_bytes(processed_stems[name], sample_rate) for name in ATARI_TRACK_NAMES}
 
     return {
-        "track_id": track_id,
+        "source_id": source_id,
         "sample_rate": sample_rate,
-        "bpm": bpm,
-        "steps": total_steps,
-        "duration_seconds": duration_seconds_rendered,
-        "duration_source": duration_source,
-        "stems_float": processed_stems,
+        "bpm": int(round(avg_bpm)),
+        "tempo_map_bpm": [round(v, 2) for v in tempo_map_bpm],
+        "duration_seconds": duration_seconds,
+        "estimated_key": key_name,
         "stems_wav": stems_wav,
-        "mix_float": mix,
         "mix_wav": _pcm16_wav_bytes(mix, sample_rate),
     }
-
-
-
-def atari_tracker():
-    return render_template("atari_tracker.html")
 
 
 @protracker_bp.get("/atari-tracker")
@@ -402,30 +517,32 @@ def atari_tracker():
 
 @protracker_bp.post("/api/atari/session")
 def atari_session_create():
-    payload = flask_request.get_json(silent=True) or {}
-    spotify_url = (payload.get("spotify_url") or flask_request.form.get("spotify_url") or "").strip()
-    duration_value = payload.get("duration_seconds") or flask_request.form.get("duration_seconds") or ""
-    duration_seconds = None
-    if str(duration_value).strip():
-        try:
-            duration_seconds = int(duration_value)
-        except ValueError:
-            return jsonify({"error": "duration_seconds must be an integer"}), 400
+    upload = flask_request.files.get("source_wav")
+    if upload is None or not upload.filename:
+        return jsonify({"error": "Attach a WAV file as source_wav"}), 400
+
+    file_bytes = upload.read()
+    if not file_bytes:
+        return jsonify({"error": "Uploaded file is empty"}), 400
+    if len(file_bytes) > 80 * 1024 * 1024:
+        return jsonify({"error": "WAV file too large (max 80 MB)"}), 400
 
     try:
-        remix = _build_atari_remix(spotify_url, duration_seconds=duration_seconds)
+        remix = _build_atari_remix_from_wav(file_bytes, upload.filename)
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
 
-    session_id = _create_atari_session(remix, spotify_url, duration_seconds)
+    session_id = _create_atari_session(remix, upload.filename)
     return jsonify(
         {
             "ok": True,
             "session_id": session_id,
-            "track_id": remix["track_id"],
+            "source_id": remix["source_id"],
+            "source_name": upload.filename,
             "bpm": remix["bpm"],
             "duration_seconds": remix["duration_seconds"],
-            "duration_source": remix["duration_source"],
+            "estimated_key": remix["estimated_key"],
+            "tempo_map_bpm": remix["tempo_map_bpm"],
             "tracks": ATARI_TRACK_NAMES,
             "mix_url": f"/api/atari/session/{session_id}/mix.wav",
             "stem_urls": {name: f"/api/atari/session/{session_id}/stem/{name}.wav" for name in ATARI_TRACK_NAMES},
@@ -439,7 +556,7 @@ def atari_session_mix(session_id: str):
     session = _get_atari_session(session_id)
     if not session:
         return jsonify({"error": "session not found or expired"}), 404
-    filename = f"atari-mix-{session['track_id']}.wav"
+    filename = f"atari-mix-{session['source_id']}.wav"
     return Response(
         session["mix_wav"],
         mimetype="audio/wav",
@@ -454,7 +571,7 @@ def atari_session_stem(session_id: str, stem_name: str):
         return jsonify({"error": "session not found or expired"}), 404
     if stem_name not in ATARI_TRACK_NAMES:
         return jsonify({"error": "unknown stem"}), 404
-    filename = f"atari-stem-{stem_name}-{session['track_id']}.wav"
+    filename = f"atari-stem-{stem_name}-{session['source_id']}.wav"
     return Response(
         session["stems_wav"][stem_name],
         mimetype="audio/wav",
@@ -469,17 +586,18 @@ def atari_session_export(session_id: str):
         return jsonify({"error": "session not found or expired"}), 404
 
     stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
-    file_prefix = f"atari8track-{session['track_id']}-{stamp}"
+    file_prefix = f"atari8track-{session['source_id']}-{stamp}"
     with io.BytesIO() as zip_buf:
         with zipfile.ZipFile(zip_buf, "w", compression=zipfile.ZIP_DEFLATED) as zf:
             zf.writestr(f"{file_prefix}/mix.wav", session["mix_wav"])
             manifest = {
-                "source": session["source_url"],
-                "track_id": session["track_id"],
-                "engine": "Deterministic Atari-inspired procedural renderer",
+                "source_name": session["source_name"],
+                "source_id": session["source_id"],
+                "engine": "WAV-driven Atari-inspired renderer",
                 "bpm": session["bpm"],
                 "duration_seconds": session["duration_seconds"],
-                "duration_source": session["duration_source"],
+                "estimated_key": session["estimated_key"],
+                "tempo_map_bpm": session["tempo_map_bpm"],
                 "sample_rate": session["sample_rate"],
                 "tracks": ATARI_TRACK_NAMES,
             }
@@ -494,84 +612,10 @@ def atari_session_export(session_id: str):
     )
 
 
-@protracker_bp.get("/api/atari/preview")
-def atari_preview():
-    spotify_url = (flask_request.args.get("spotify_url") or "").strip()
-    duration_value = flask_request.args.get("duration_seconds", "")
-    duration_seconds = None
-    if duration_value.strip():
-        try:
-            duration_seconds = int(duration_value)
-        except ValueError:
-            return jsonify({"error": "duration_seconds must be an integer"}), 400
-
-    try:
-        remix = _build_atari_remix(spotify_url, duration_seconds=duration_seconds)
-    except ValueError as exc:
-        return jsonify({"error": str(exc)}), 400
-
-    filename = f"atari-preview-{remix['track_id']}.wav"
-    return Response(
-        remix["mix_wav"],
-        mimetype="audio/wav",
-        headers={
-            "Content-Disposition": f'inline; filename="{filename}"',
-            "X-Atari-BPM": str(remix["bpm"]),
-            "X-Atari-Duration-Source": remix["duration_source"],
-            "X-Atari-Duration-Seconds": str(remix["duration_seconds"]),
-        },
-    )
-
-
 @protracker_bp.post("/api/atari/export")
 def atari_export():
     payload = flask_request.get_json(silent=True) or {}
-    spotify_url = (payload.get("spotify_url") or flask_request.form.get("spotify_url") or "").strip()
     session_id = (payload.get("session_id") or flask_request.form.get("session_id") or "").strip()
-    if session_id:
-        session = _get_atari_session(session_id)
-        if not session:
-            return jsonify({"error": "session not found or expired"}), 404
-        return atari_session_export(session_id)
-
-    duration_value = payload.get("duration_seconds") or flask_request.form.get("duration_seconds") or ""
-    duration_seconds = None
-    if str(duration_value).strip():
-        try:
-            duration_seconds = int(duration_value)
-        except ValueError:
-            return jsonify({"error": "duration_seconds must be an integer"}), 400
-
-    try:
-        remix = _build_atari_remix(spotify_url, duration_seconds=duration_seconds)
-    except ValueError as exc:
-        return jsonify({"error": str(exc)}), 400
-
-    stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
-    file_prefix = f"atari8track-{remix['track_id']}-{stamp}"
-    with io.BytesIO() as zip_buf:
-        with zipfile.ZipFile(zip_buf, "w", compression=zipfile.ZIP_DEFLATED) as zf:
-            zf.writestr(f"{file_prefix}/mix.wav", remix["mix_wav"])
-            manifest = {
-                "source": spotify_url,
-                "track_id": remix["track_id"],
-                "engine": "Deterministic Atari-inspired procedural renderer",
-                "bpm": remix["bpm"],
-                "duration_seconds": remix["duration_seconds"],
-                "duration_source": remix["duration_source"],
-                "sample_rate": remix["sample_rate"],
-                "tracks": ATARI_TRACK_NAMES,
-            }
-            zf.writestr(f"{file_prefix}/session.json", json.dumps(manifest, indent=2))
-            for stem_name in ATARI_TRACK_NAMES:
-                wav_data = remix["stems_wav"][stem_name]
-                zf.writestr(f"{file_prefix}/stems/{stem_name}.wav", wav_data)
-
-        zip_bytes = zip_buf.getvalue()
-
-    return Response(
-        zip_bytes,
-        mimetype="application/zip",
-        headers={"Content-Disposition": f'attachment; filename="{file_prefix}.zip"'},
-    )
-
+    if not session_id:
+        return jsonify({"error": "session_id required"}), 400
+    return atari_session_export(session_id)

@@ -67,7 +67,7 @@
       background: #131924;
     }
     .label { display:block; margin-bottom:.35rem; color:#b9c8e5; font-size:.8rem; }
-    input[type="text"], input[type="number"] {
+    input[type="number"] {
       width: 100%;
       border: 1px solid #46526a;
       border-radius: 9px;
@@ -76,8 +76,16 @@
       padding: .56rem .62rem;
       font: inherit;
     }
+    input[type="file"] {
+      width: 100%;
+      border: 1px dashed #5c6c89;
+      border-radius: 9px;
+      background: #0d121a;
+      color: var(--ink);
+      padding: .62rem;
+      font: inherit;
+    }
     .stack { display: grid; gap: .55rem; }
-    .row { display:grid; grid-template-columns: 1fr 110px; gap:.5rem; }
     .btns { display:flex; gap:.45rem; flex-wrap:wrap; margin-top:.35rem; }
     button, .btn {
       border: 1px solid var(--line);
@@ -154,7 +162,6 @@
       .channels { grid-template-columns: repeat(4, minmax(88px, 1fr)); }
     }
     @media (max-width: 560px) {
-      .row { grid-template-columns: 1fr; }
       .channels { grid-template-columns: repeat(2, minmax(88px, 1fr)); }
     }
   </style>
@@ -165,25 +172,19 @@
     <section class="frame">
       <div class="head">
         <h1>ATARI PROTRACKER STYLE 8-TRACK MIXER</h1>
-        <div class="sub">Generate full-song procedural stems from a Spotify link, then mix in realtime with digital VU metering.</div>
+        <div class="sub">Upload a WAV file. The remix follows source length, estimated key, section energy, and tempo movement for timeline sync.</div>
       </div>
 
       <div class="layout">
         <section class="panel">
           <div class="stack">
             <div>
-              <label class="label" for="spotify-url">Spotify Track URL</label>
-              <input id="spotify-url" type="text" placeholder="https://open.spotify.com/track/..." value="https://open.spotify.com/track/11dFghVXANMlKmJXsNCbNl">
+              <label class="label" for="source-wav">Source WAV File</label>
+              <input id="source-wav" type="file" accept=".wav,audio/wav">
             </div>
-            <div class="row">
-              <div>
-                <label class="label" for="duration-seconds">Length (seconds)</label>
-                <input id="duration-seconds" type="number" min="20" max="1200" step="1" placeholder="Auto">
-              </div>
-              <div>
-                <label class="label" for="master-gain">Master</label>
-                <input id="master-gain" type="number" min="0" max="2" step="0.05" value="1.00">
-              </div>
+            <div>
+              <label class="label" for="master-gain">Master</label>
+              <input id="master-gain" type="number" min="0" max="2" step="0.05" value="1.00">
             </div>
             <div class="btns">
               <button id="build" class="primary" type="button">Build Session</button>
@@ -193,10 +194,10 @@
             <div id="status" class="status">Ready.</div>
 
             <div class="readout">
-              <div class="cell"><b>Track ID</b><span id="meta-id">-</span></div>
-              <div class="cell"><b>BPM</b><span id="meta-bpm">-</span></div>
-              <div class="cell"><b>Duration</b><span id="meta-duration">-</span></div>
               <div class="cell"><b>Source</b><span id="meta-source">-</span></div>
+              <div class="cell"><b>Avg BPM</b><span id="meta-bpm">-</span></div>
+              <div class="cell"><b>Duration</b><span id="meta-duration">-</span></div>
+              <div class="cell"><b>Estimated Key</b><span id="meta-key">-</span></div>
             </div>
           </div>
         </section>
@@ -211,7 +212,7 @@
 
           <div class="channels" id="channels"></div>
           <div class="note">
-            Length defaults to Spotify duration when detectable. If Spotify blocks metadata, fallback is 180 seconds unless you set Length manually.
+            Tip: drag the original WAV into your DAW and align start time with this remix. They are rendered to the source timeline length.
           </div>
         </section>
       </div>
@@ -236,8 +237,7 @@
     };
 
     const el = {
-      spotifyUrl: document.getElementById("spotify-url"),
-      durationSeconds: document.getElementById("duration-seconds"),
+      sourceWav: document.getElementById("source-wav"),
       masterGain: document.getElementById("master-gain"),
       build: document.getElementById("build"),
       download: document.getElementById("download"),
@@ -247,10 +247,10 @@
       status: document.getElementById("status"),
       timeReadout: document.getElementById("time-readout"),
       channels: document.getElementById("channels"),
-      metaId: document.getElementById("meta-id"),
+      metaSource: document.getElementById("meta-source"),
       metaBpm: document.getElementById("meta-bpm"),
       metaDuration: document.getElementById("meta-duration"),
-      metaSource: document.getElementById("meta-source"),
+      metaKey: document.getElementById("meta-key"),
     };
 
     const vuElements = new Map();
@@ -422,31 +422,34 @@
     }
 
     async function buildSession() {
-      const spotifyUrl = el.spotifyUrl.value.trim();
-      if (!spotifyUrl) {
-        setStatus("Paste a Spotify track URL first.", "error");
+      const file = el.sourceWav.files?.[0];
+      if (!file) {
+        setStatus("Choose a WAV file first.", "error");
         return;
       }
 
-      const durationRaw = el.durationSeconds.value.trim();
-      const payload = { spotify_url: spotifyUrl };
-      if (durationRaw) payload.duration_seconds = Number.parseInt(durationRaw, 10);
+      if (!file.name.toLowerCase().endsWith(".wav")) {
+        setStatus("Only WAV files are supported.", "error");
+        return;
+      }
 
       el.build.disabled = true;
       el.download.disabled = true;
       el.play.disabled = true;
       el.stop.disabled = true;
       el.reset.disabled = true;
-      setStatus("Building full-length Atari session...");
+      setStatus("Analyzing WAV and building synced Atari session...");
 
       try {
         await ensureAudioContext();
         pausePlayback();
 
+        const form = new FormData();
+        form.append("source_wav", file, file.name);
+
         const res = await fetch("/api/atari/session", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
+          body: form,
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Session build failed");
@@ -454,17 +457,17 @@
         state.sessionId = data.session_id;
         await loadSessionStems(data.stem_urls);
 
-        el.metaId.textContent = data.track_id;
+        el.metaSource.textContent = data.source_name || "uploaded.wav";
         el.metaBpm.textContent = String(data.bpm);
         el.metaDuration.textContent = `${data.duration_seconds}s`;
-        el.metaSource.textContent = data.duration_source;
+        el.metaKey.textContent = data.estimated_key || "-";
 
         el.download.disabled = false;
         el.play.disabled = false;
         el.stop.disabled = false;
         el.reset.disabled = false;
 
-        setStatus(`Session ready (${data.duration_seconds}s, ${data.bpm} BPM).`, "ok");
+        setStatus(`Session ready (${data.duration_seconds}s, ${data.bpm} BPM, ${data.estimated_key}).`, "ok");
       } catch (err) {
         setStatus(err.message || "Session build failed.", "error");
       } finally {
