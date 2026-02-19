@@ -4665,7 +4665,7 @@ def _fetch_spotify_duration_seconds(track_id: str) -> int | None:
         },
     )
     try:
-        with request.urlopen(req, timeout=8) as resp:
+        with request.urlopen(req, timeout=3) as resp:
             body = resp.read().decode("utf-8", errors="ignore")
     except Exception:
         return None
@@ -4855,13 +4855,15 @@ def _build_atari_remix(spotify_url: str, duration_seconds: int | None = None) ->
     total_steps = max(64, int(math.ceil((seconds_target * sample_rate) / max(1, step_samples))))
     total_samples = total_steps * step_samples
     duration_seconds_rendered = int(round(total_samples / sample_rate))
+    cell_steps = min(total_steps, 16 * 16)
+    cell_samples = cell_steps * step_samples
 
     root_idx = seed_int % len(ATARI_NOTE_POOL)
     root_note = ATARI_NOTE_POOL[root_idx]
     progression = [0, 5, 7, 3, 0, 8, 5, 7]
-    stems_float = {name: [0.0] * total_samples for name in ATARI_TRACK_NAMES}
+    stems_cell = {name: [0.0] * cell_samples for name in ATARI_TRACK_NAMES}
 
-    for step in range(total_steps):
+    for step in range(cell_steps):
         step_in_bar = step % 16
         bar_idx = step // 16
         section_idx = (bar_idx // 8) % 4
@@ -4870,17 +4872,16 @@ def _build_atari_remix(spotify_url: str, duration_seconds: int | None = None) ->
 
         is_intro = section_idx == 0
         is_break = section_idx == 2
-        is_final = bar_idx >= (total_steps // 16) - 8
 
         if step_in_bar in (0, 8) or (step_in_bar == 12 and rng.random() < 0.26):
-            _add_kick(stems_float["kick"], start, sample_rate, 0.85)
+            _add_kick(stems_cell["kick"], start, sample_rate, 0.85)
         if not is_intro and step_in_bar in (4,) and rng.random() < 0.3:
-            _add_kick(stems_float["kick"], start, sample_rate, 0.45)
+            _add_kick(stems_cell["kick"], start, sample_rate, 0.45)
 
         if step_in_bar in (4, 12) or (step_in_bar == 15 and rng.random() < 0.15):
-            _add_noise_hit(stems_float["snare"], start, int(sample_rate * 0.18), 0.55, rng, decay=5.2)
+            _add_noise_hit(stems_cell["snare"], start, int(sample_rate * 0.18), 0.55, rng, decay=5.2)
             _add_tone(
-                stems_float["snare"],
+                stems_cell["snare"],
                 start,
                 int(sample_rate * 0.14),
                 sample_rate,
@@ -4892,12 +4893,12 @@ def _build_atari_remix(spotify_url: str, duration_seconds: int | None = None) ->
 
         if step_in_bar % 2 == 0 and not (is_break and step_in_bar in (0, 8)):
             hat_amp = 0.22 if step_in_bar not in (14,) else 0.3
-            _add_noise_hit(stems_float["hat"], start, int(sample_rate * 0.05), hat_amp, rng, decay=7.5)
+            _add_noise_hit(stems_cell["hat"], start, int(sample_rate * 0.05), hat_amp, rng, decay=7.5)
 
         if step_in_bar in (0, 3, 8, 11) and not (is_intro and step_in_bar == 3):
             bass_note = chord_root - 12 + (0 if step_in_bar in (0, 8) else 7)
             _add_tone(
-                stems_float["bass"],
+                stems_cell["bass"],
                 start,
                 int(step_samples * 1.6),
                 sample_rate,
@@ -4911,7 +4912,7 @@ def _build_atari_remix(spotify_url: str, duration_seconds: int | None = None) ->
             arp_offsets = [0, 7, 12, 7]
             arp_note = chord_root + arp_offsets[(step_in_bar // 2) % len(arp_offsets)]
             _add_tone(
-                stems_float["arp"],
+                stems_cell["arp"],
                 start,
                 int(step_samples * 0.9),
                 sample_rate,
@@ -4925,7 +4926,7 @@ def _build_atari_remix(spotify_url: str, duration_seconds: int | None = None) ->
             chord_stack = [0, 4, 7]
             for n in chord_stack:
                 _add_tone(
-                    stems_float["chord"],
+                    stems_cell["chord"],
                     start,
                     int(step_samples * 7.2),
                     sample_rate,
@@ -4939,7 +4940,7 @@ def _build_atari_remix(spotify_url: str, duration_seconds: int | None = None) ->
             melody_offsets = [12, 10, 7, 14, 15, 12, 19, 17]
             note = chord_root + melody_offsets[(bar_idx + step_in_bar) % len(melody_offsets)]
             _add_tone(
-                stems_float["lead"],
+                stems_cell["lead"],
                 start,
                 int(step_samples * 1.2),
                 sample_rate,
@@ -4949,14 +4950,20 @@ def _build_atari_remix(spotify_url: str, duration_seconds: int | None = None) ->
                 rng,
             )
 
-        if step_in_bar == 15 and (bar_idx % 4 == 3 or is_final):
-            _add_noise_hit(stems_float["fx"], start, int(sample_rate * 0.22), 0.27, rng, decay=2.0)
+        if step_in_bar == 15 and bar_idx % 4 == 3:
+            _add_noise_hit(stems_cell["fx"], start, int(sample_rate * 0.22), 0.27, rng, decay=2.0)
 
-    processed_stems = {}
-    for name, data in stems_float.items():
+    processed_cell = {}
+    for name, data in stems_cell.items():
         low = _simple_lowpass(data, alpha=0.17 if name in {"lead", "arp", "hat"} else 0.24)
         crushed = _bitcrush(low, levels=36 if name in {"lead", "arp", "bass"} else 42, hold=2)
-        processed_stems[name] = _normalize(crushed, ceiling=0.88)
+        processed_cell[name] = _normalize(crushed, ceiling=0.88)
+
+    processed_stems = {}
+    for name, cell_data in processed_cell.items():
+        repeats = int(math.ceil(total_samples / max(1, len(cell_data))))
+        tiled = (cell_data * repeats)[:total_samples]
+        processed_stems[name] = tiled
 
     mix = [0.0] * total_samples
     for name in ATARI_TRACK_NAMES:
