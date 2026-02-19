@@ -238,6 +238,28 @@ def _subsample_hold(samples: list[float], hold: int = 2) -> array:
     return out
 
 
+def _quantize_signed_8bit(samples: list[float] | array) -> array:
+    out = array("f", [0.0]) * len(samples)
+    for i in range(len(samples)):
+        q = int(max(-128, min(127, round(samples[i] * 127.0))))
+        out[i] = q / 128.0
+    return out
+
+
+def _one_pole_lowpass(samples: list[float] | array, sample_rate: int, cutoff_hz: float) -> array:
+    if not samples:
+        return array("f")
+    rc = 1.0 / (2.0 * math.pi * max(1.0, cutoff_hz))
+    dt = 1.0 / max(1.0, sample_rate)
+    alpha = dt / (rc + dt)
+    out = array("f", [0.0]) * len(samples)
+    prev = 0.0
+    for i in range(len(samples)):
+        prev = prev + alpha * (samples[i] - prev)
+        out[i] = prev
+    return out
+
+
 def _make_tracker_instruments(sample_rate: int) -> dict[str, array]:
     # Approximate classic tracker one-shot drum samples + tiny looped wavetable instruments.
     length_kick = int(sample_rate * 0.24)
@@ -319,6 +341,35 @@ def _render_wavetable_note(
         s = wavetable[int(phase) % tbl_len]
         phase += phase_inc
         dst[idx] += s * amp * env
+
+
+def _render_arpeggio_note(
+    dst: array,
+    start: int,
+    length: int,
+    wavetable: array,
+    base_midi: int,
+    interval_a: int,
+    interval_b: int,
+    sample_rate: int,
+    amp: float,
+) -> None:
+    if length <= 0:
+        return
+    tick_samples = max(8, int(sample_rate / 50.0))
+    notes = [base_midi, base_midi + interval_a, base_midi + interval_b]
+    pos = 0
+    for i in range(length):
+        note = notes[(i // tick_samples) % 3]
+        freq = _midi_to_hz(max(24, min(96, note)))
+        idx = start + i
+        if idx >= len(dst):
+            break
+        phase_pos = pos / sample_rate
+        pos += 1
+        tbl = int((phase_pos * freq * len(wavetable)) % len(wavetable))
+        env = 1.0 - (i / max(1, length))
+        dst[idx] += wavetable[tbl] * amp * env
 
 
 def _median_midi(notes: list[int]) -> int | None:
@@ -962,12 +1013,14 @@ def _build_atari_remix_from_wav(file_bytes: bytes, source_name: str) -> dict:
                 min(0.7, 0.2 + mid_norm * 0.35),
             )
             arp_note = lead_note + (12 if i % 4 == 0 else 7)
-            _render_wavetable_note(
+            _render_arpeggio_note(
                 stems_float["arp"],
                 start,
                 int(step_len * 0.8),
                 instruments["arp"],
-                _midi_to_hz(max(36, min(96, arp_note))),
+                max(36, min(96, arp_note)),
+                4,
+                7,
                 sample_rate,
                 min(0.55, 0.15 + high_norm * 0.3),
             )
@@ -975,12 +1028,18 @@ def _build_atari_remix_from_wav(file_bytes: bytes, source_name: str) -> dict:
         chord_ref = lead_note if lead_note is not None else bass_note
         if chord_ref is not None and i % 4 == 0:
             root = max(36, chord_ref - (chord_ref % 12))
-            third = root + (3 if "minor" in key_name else 4)
-            fifth = root + 7
             chord_len = int(step_len * 2.8)
-            _render_wavetable_note(stems_float["chord"], start, chord_len, instruments["chord"], _midi_to_hz(root), sample_rate, 0.15)
-            _render_wavetable_note(stems_float["chord"], start, chord_len, instruments["chord"], _midi_to_hz(third), sample_rate, 0.12)
-            _render_wavetable_note(stems_float["chord"], start, chord_len, instruments["chord"], _midi_to_hz(fifth), sample_rate, 0.12)
+            _render_arpeggio_note(
+                stems_float["chord"],
+                start,
+                chord_len,
+                instruments["chord"],
+                root,
+                3 if "minor" in key_name else 4,
+                7,
+                sample_rate,
+                0.18,
+            )
 
         if fx_hit:
             _render_wavetable_note(stems_float["fx"], start, int(step_len * 1.5), instruments["fx"], 900.0, sample_rate, 0.2)
@@ -1006,7 +1065,9 @@ def _build_atari_remix_from_wav(file_bytes: bytes, source_name: str) -> dict:
     mix = array("f", [0.0]) * total_samples
     stems_wav: dict[str, bytes] = {}
     for name, data in stems_float.items():
-        track = _bitcrush(_subsample_hold(data, hold=2), levels=42 if name in {"lead", "arp"} else 48, hold=2)
+        track = _subsample_hold(data, hold=2)
+        track = _quantize_signed_8bit(track)
+        track = _bitcrush(track, levels=40 if name in {"lead", "arp"} else 48, hold=2)
         track = _normalize(_soft_clip(track, drive=1.08), ceiling=0.86)
         stems_wav[name] = _pcm16_wav_bytes(track, sample_rate)
         weight = 1.0
@@ -1017,6 +1078,8 @@ def _build_atari_remix_from_wav(file_bytes: bytes, source_name: str) -> dict:
         for i in range(total_samples):
             mix[i] += track[i] * weight
 
+    # Approximate Amiga 500 output coloration.
+    mix = _one_pole_lowpass(mix, sample_rate, cutoff_hz=4420.0)
     mix = _normalize(_soft_clip(mix, drive=1.1), ceiling=0.9)
 
     return {
