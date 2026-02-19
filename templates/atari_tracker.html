@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Atari 8-Track Spotify Remixer</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=IBM+Plex+Mono:wght@400;500;700&display=swap');
+    :root {
+      --bg: #121417;
+      --panel: #1b1f26;
+      --line: #3a4558;
+      --ink: #e8f0ff;
+      --muted: #94a3bc;
+      --accent: #52f7c4;
+      --accent-2: #ffda5f;
+      --danger: #ff7d7d;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      font-family: "IBM Plex Mono", monospace;
+      background:
+        radial-gradient(1100px 420px at 8% -15%, rgba(82, 247, 196, 0.16), transparent 54%),
+        radial-gradient(900px 360px at 100% -10%, rgba(255, 218, 95, 0.12), transparent 57%),
+        linear-gradient(180deg, #101215 0%, #151922 100%);
+      min-height: 100vh;
+    }
+    .scan {
+      pointer-events: none;
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(to bottom, rgba(255,255,255,0.02) 0, rgba(255,255,255,0.02) 1px, transparent 3px, transparent 5px);
+      opacity: .18;
+      mix-blend-mode: soft-light;
+    }
+    main { max-width: 980px; margin: 0 auto; padding: 1.3rem 1rem 2rem; }
+    .frame {
+      background: linear-gradient(165deg, rgba(27,31,38,.96) 0%, rgba(20,24,30,.96) 100%);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      box-shadow: 0 14px 40px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.04);
+      overflow: hidden;
+    }
+    .header {
+      padding: 1.05rem;
+      border-bottom: 1px solid var(--line);
+      background: linear-gradient(90deg, rgba(82,247,196,.08), rgba(255,218,95,.08));
+    }
+    h1 {
+      margin: 0;
+      font-family: "Press Start 2P", monospace;
+      font-size: clamp(.8rem, 2.2vw, 1.1rem);
+      line-height: 1.6;
+      color: var(--accent);
+      text-shadow: 0 0 10px rgba(82,247,196,.38);
+    }
+    .subtitle { margin: .6rem 0 0; color: var(--muted); font-size: .92rem; }
+    .body { padding: 1rem; display: grid; gap: 1rem; }
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: .9rem;
+      background: #141920;
+    }
+    .label { display: block; margin-bottom: .45rem; font-size: .85rem; color: #b5c5e0; }
+    input[type="text"], input[type="number"] {
+      width: 100%;
+      border-radius: 10px;
+      border: 1px solid #4b5870;
+      background: #0f1319;
+      color: var(--ink);
+      padding: .62rem .72rem;
+      font: inherit;
+    }
+    .row { display: grid; grid-template-columns: 1fr 120px; gap: .75rem; }
+    .btns { display: flex; gap: .6rem; flex-wrap: wrap; margin-top: .7rem; }
+    button, a.btn {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: .58rem .84rem;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+      color: var(--ink);
+      background: #202833;
+      text-decoration: none;
+      transition: transform .14s ease, border-color .14s ease, box-shadow .14s ease;
+    }
+    button:hover, a.btn:hover { transform: translateY(-1px); border-color: #64748b; }
+    button.primary {
+      background: linear-gradient(180deg, #51f0be 0%, #37d8a5 100%);
+      color: #062418;
+      border-color: #5fe9bd;
+      box-shadow: 0 8px 20px rgba(82,247,196,.25);
+    }
+    button.warn {
+      background: linear-gradient(180deg, #ffe38c 0%, #ffcf45 100%);
+      color: #282109;
+      border-color: #ffd75e;
+    }
+    .status {
+      margin-top: .8rem;
+      font-size: .88rem;
+      color: var(--muted);
+      min-height: 1.2rem;
+    }
+    .status.error { color: var(--danger); }
+    .readout {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: .6rem;
+    }
+    .cell {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #0f141b;
+      padding: .6rem;
+    }
+    .cell b { display:block; color:var(--accent-2); margin-bottom:.2rem; font-size:.72rem; }
+    .cell span { font-weight:700; font-size:1rem; }
+    .tracks {
+      margin: .3rem 0 0;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: .45rem;
+      font-size: .78rem;
+      color: #b5c5e0;
+    }
+    .tracks div {
+      background: #0e1319;
+      border: 1px solid #384459;
+      border-radius: 8px;
+      padding: .35rem .45rem;
+      text-align: center;
+    }
+    audio { width: 100%; margin-top: .6rem; }
+    .note { margin: .55rem 0 0; font-size: .8rem; color: var(--muted); line-height: 1.5; }
+    @media (max-width: 720px) {
+      .row { grid-template-columns: 1fr; }
+      .tracks { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+  </style>
+</head>
+<body>
+  <div class="scan"></div>
+  <main>
+    <section class="frame">
+      <div class="header">
+        <h1>ATARI 8-TRACK REMIXER</h1>
+        <p class="subtitle">Paste a Spotify track URL and render a deterministic lo-fi tracker-style interpretation with exportable stems.</p>
+      </div>
+      <div class="body">
+        <div class="panel">
+          <label class="label" for="spotify-url">Spotify Track URL</label>
+          <div class="row">
+            <input id="spotify-url" type="text" placeholder="https://open.spotify.com/track/..." value="https://open.spotify.com/track/11dFghVXANMlKmJXsNCbNl">
+            <input id="bars" type="number" min="4" max="32" step="1" value="16" title="Bars">
+          </div>
+          <div class="btns">
+            <button id="preview" class="primary" type="button">Preview Remix</button>
+            <button id="export" class="warn" type="button">Export Stems ZIP</button>
+            <a class="btn" href="/" target="_blank" rel="noopener">Back Home</a>
+          </div>
+          <audio id="player" controls></audio>
+          <div id="status" class="status">Ready.</div>
+          <p class="note">This tool does not fetch Spotify audio. It procedurally generates an Atari-inspired version based on the track ID.</p>
+        </div>
+
+        <div class="panel">
+          <div class="readout">
+            <div class="cell"><b>Engine</b><span>ProTracker-inspired</span></div>
+            <div class="cell"><b>Voices</b><span>8 Tracks</span></div>
+            <div class="cell"><b>Output</b><span>WAV + stems ZIP</span></div>
+            <div class="cell"><b>Character</b><span>Lo-fi / Bitcrushed</span></div>
+          </div>
+          <div class="tracks">
+            <div>KICK</div>
+            <div>SNARE</div>
+            <div>HAT</div>
+            <div>BASS</div>
+            <div>ARP</div>
+            <div>CHORD</div>
+            <div>LEAD</div>
+            <div>FX</div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const spotifyInput = document.getElementById("spotify-url");
+    const barsInput = document.getElementById("bars");
+    const previewBtn = document.getElementById("preview");
+    const exportBtn = document.getElementById("export");
+    const statusEl = document.getElementById("status");
+    const player = document.getElementById("player");
+
+    function setStatus(message, isError = false) {
+      statusEl.textContent = message;
+      statusEl.classList.toggle("error", isError);
+    }
+
+    function getParams() {
+      return {
+        spotify_url: spotifyInput.value.trim(),
+        bars: Number.parseInt(barsInput.value || "16", 10)
+      };
+    }
+
+    previewBtn.addEventListener("click", async () => {
+      const { spotify_url, bars } = getParams();
+      if (!spotify_url) {
+        setStatus("Paste a Spotify track URL first.", true);
+        return;
+      }
+      setStatus("Rendering preview...");
+      previewBtn.disabled = true;
+      try {
+        const qs = new URLSearchParams({ spotify_url, bars: String(bars) });
+        const res = await fetch(`/api/atari/preview?${qs.toString()}`);
+        if (!res.ok) {
+          const payload = await res.json().catch(() => ({}));
+          throw new Error(payload.error || "Preview failed");
+        }
+        const blob = await res.blob();
+        const src = URL.createObjectURL(blob);
+        player.src = src;
+        await player.play().catch(() => {});
+        const bpm = res.headers.get("X-Atari-BPM");
+        setStatus(`Preview ready${bpm ? ` at ${bpm} BPM` : ""}.`);
+      } catch (err) {
+        setStatus(err.message || "Preview failed.", true);
+      } finally {
+        previewBtn.disabled = false;
+      }
+    });
+
+    exportBtn.addEventListener("click", async () => {
+      const payload = getParams();
+      if (!payload.spotify_url) {
+        setStatus("Paste a Spotify track URL first.", true);
+        return;
+      }
+      setStatus("Building stem export ZIP...");
+      exportBtn.disabled = true;
+      try {
+        const res = await fetch("/api/atari/export", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body.error || "Export failed");
+        }
+        const blob = await res.blob();
+        const href = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        const contentDisposition = res.headers.get("Content-Disposition") || "";
+        const match = contentDisposition.match(/filename="([^"]+)"/);
+        a.href = href;
+        a.download = match ? match[1] : "atari-stems.zip";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setStatus("Stem export downloaded.");
+      } catch (err) {
+        setStatus(err.message || "Export failed.", true);
+      } finally {
+        exportBtn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
