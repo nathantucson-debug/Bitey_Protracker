@@ -867,13 +867,13 @@ def _add_kick(buffer: list[float], start_sample: int, sample_rate: int, amp: flo
 
 def _build_atari_remix_from_wav(file_bytes: bytes, source_name: str) -> dict:
     source_samples, source_rate = _read_wav_mono(file_bytes)
-    max_seconds = 150
+    max_seconds = 75
     max_src_samples = max_seconds * source_rate
     if len(source_samples) > max_src_samples:
-        raise ValueError("Source WAV is too long for this Render tier (max 150s)")
+        raise ValueError("Source WAV is too long for fast build mode (max 75s)")
 
     source_id = hashlib.sha256(file_bytes).hexdigest()[:16]
-    sample_rate = 12000
+    sample_rate = 8000
     mono = _resample_linear(source_samples, source_rate, sample_rate) if source_rate != sample_rate else source_samples[:]
     if not mono:
         raise ValueError("No audio content found after decoding")
@@ -894,7 +894,7 @@ def _build_atari_remix_from_wav(file_bytes: bytes, source_name: str) -> dict:
         mid_band[i] = mid_lp[i] - low[i]
         high_band[i] = mono[i] - mid_lp[i]
 
-    step_starts = _build_step_starts(total_samples, sample_rate, tempo_map_bpm, max_rows=2048)
+    step_starts = _build_step_starts(total_samples, sample_rate, tempo_map_bpm, max_rows=1024)
     row_times_seconds = [round(s / sample_rate, 4) for s in step_starts]
     rows_per_pattern = 64
     instruments = _make_tracker_instruments(sample_rate)
