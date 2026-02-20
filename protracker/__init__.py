@@ -111,6 +111,7 @@ def _start_atari_job(file_bytes: bytes, source_name: str) -> str:
                 "tempo_map_bpm": remix["tempo_map_bpm"],
                 "rows_per_pattern": remix["rows_per_pattern"],
                 "pattern_rows": remix["pattern_rows"],
+                "internal_midi_events": remix["internal_midi_events"],
                 "row_times_seconds": remix["row_times_seconds"],
                 "tracks": ATARI_TRACK_NAMES,
                 "mix_url": f"/api/atari/session/{session_id}/mix.wav",
@@ -164,6 +165,7 @@ def _create_atari_session(remix: dict, source_name: str) -> str:
         "tempo_map_bpm": remix["tempo_map_bpm"],
         "rows_per_pattern": remix["rows_per_pattern"],
         "pattern_rows": remix["pattern_rows"],
+        "internal_midi_events": remix["internal_midi_events"],
         "row_times_seconds": remix["row_times_seconds"],
         "mix_path": mix_path,
         "stem_paths": stem_paths,
@@ -961,6 +963,7 @@ def _build_atari_remix_from_wav(file_bytes: bytes, source_name: str) -> dict:
     max_high = max(step_high, default=1.0) or 1.0
     stems_float = {name: array("f", [0.0]) * total_samples for name in ATARI_TRACK_NAMES}
     pattern_rows: list[list[str]] = []
+    midi_events: dict[str, list[dict]] = {name: [] for name in ATARI_TRACK_NAMES}
 
     prev_low = 0.0
     prev_drum = 0.0
@@ -984,14 +987,24 @@ def _build_atari_remix_from_wav(file_bytes: bytes, source_name: str) -> dict:
 
         if kick_hit:
             _render_one_shot(stems_float["kick"], start, instruments["kick"], min(1.0, 0.55 + low_norm * 0.6))
+            midi_events["kick"].append(
+                {"start_sec": round(start / sample_rate, 4), "dur_sec": 0.12, "note": 36, "vel": round(min(1.0, 0.55 + low_norm * 0.6), 3)}
+            )
         if snare_hit:
             _render_one_shot(stems_float["snare"], start, instruments["snare"], min(1.0, 0.45 + mid_norm * 0.55))
+            midi_events["snare"].append(
+                {"start_sec": round(start / sample_rate, 4), "dur_sec": 0.1, "note": 38, "vel": round(min(1.0, 0.45 + mid_norm * 0.55), 3)}
+            )
         if hat_hit:
             _render_one_shot(stems_float["hat"], start, instruments["hat"], min(1.0, 0.3 + high_norm * 0.5))
+            midi_events["hat"].append(
+                {"start_sec": round(start / sample_rate, 4), "dur_sec": 0.06, "note": 42, "vel": round(min(1.0, 0.3 + high_norm * 0.5), 3)}
+            )
 
         bass_note = bass_lane[i]
         lead_note = lead_lane[i]
         if bass_note is not None:
+            bass_amp = min(0.8, 0.25 + low_norm * 0.4)
             _render_wavetable_note(
                 stems_float["bass"],
                 start,
@@ -999,10 +1012,14 @@ def _build_atari_remix_from_wav(file_bytes: bytes, source_name: str) -> dict:
                 instruments["bass"],
                 _midi_to_hz(bass_note),
                 sample_rate,
-                min(0.8, 0.25 + low_norm * 0.4),
+                bass_amp,
+            )
+            midi_events["bass"].append(
+                {"start_sec": round(start / sample_rate, 4), "dur_sec": round((step_len * 1.5) / sample_rate, 4), "note": bass_note, "vel": round(bass_amp, 3)}
             )
 
         if lead_note is not None and i % 2 == 0:
+            lead_amp = min(0.7, 0.2 + mid_norm * 0.35)
             _render_wavetable_note(
                 stems_float["lead"],
                 start,
@@ -1010,9 +1027,13 @@ def _build_atari_remix_from_wav(file_bytes: bytes, source_name: str) -> dict:
                 instruments["lead"],
                 _midi_to_hz(lead_note),
                 sample_rate,
-                min(0.7, 0.2 + mid_norm * 0.35),
+                lead_amp,
+            )
+            midi_events["lead"].append(
+                {"start_sec": round(start / sample_rate, 4), "dur_sec": round(step_len / sample_rate, 4), "note": lead_note, "vel": round(lead_amp, 3)}
             )
             arp_note = lead_note + (12 if i % 4 == 0 else 7)
+            arp_amp = min(0.55, 0.15 + high_norm * 0.3)
             _render_arpeggio_note(
                 stems_float["arp"],
                 start,
@@ -1022,13 +1043,22 @@ def _build_atari_remix_from_wav(file_bytes: bytes, source_name: str) -> dict:
                 4,
                 7,
                 sample_rate,
-                min(0.55, 0.15 + high_norm * 0.3),
+                arp_amp,
+            )
+            midi_events["arp"].append(
+                {
+                    "start_sec": round(start / sample_rate, 4),
+                    "dur_sec": round((step_len * 0.8) / sample_rate, 4),
+                    "note": max(36, min(96, arp_note)),
+                    "vel": round(arp_amp, 3),
+                }
             )
 
         chord_ref = lead_note if lead_note is not None else bass_note
         if chord_ref is not None and i % 4 == 0:
             root = max(36, chord_ref - (chord_ref % 12))
             chord_len = int(step_len * 2.8)
+            chord_amp = 0.18
             _render_arpeggio_note(
                 stems_float["chord"],
                 start,
@@ -1038,11 +1068,17 @@ def _build_atari_remix_from_wav(file_bytes: bytes, source_name: str) -> dict:
                 3 if "minor" in key_name else 4,
                 7,
                 sample_rate,
-                0.18,
+                chord_amp,
+            )
+            midi_events["chord"].append(
+                {"start_sec": round(start / sample_rate, 4), "dur_sec": round(chord_len / sample_rate, 4), "note": root, "vel": round(chord_amp, 3)}
             )
 
         if fx_hit:
             _render_wavetable_note(stems_float["fx"], start, int(step_len * 1.5), instruments["fx"], 900.0, sample_rate, 0.2)
+            midi_events["fx"].append(
+                {"start_sec": round(start / sample_rate, 4), "dur_sec": round((step_len * 1.5) / sample_rate, 4), "note": 84, "vel": 0.2}
+            )
 
         row_cells = ["--- 00 000" for _ in range(8)]
         if kick_hit:
@@ -1089,6 +1125,7 @@ def _build_atari_remix_from_wav(file_bytes: bytes, source_name: str) -> dict:
         "tempo_map_bpm": [round(v, 2) for v in tempo_map_bpm],
         "rows_per_pattern": rows_per_pattern,
         "pattern_rows": pattern_rows,
+        "internal_midi_events": midi_events,
         "row_times_seconds": row_times_seconds,
         "duration_seconds": duration_seconds,
         "estimated_key": key_name,
@@ -1185,6 +1222,7 @@ def atari_session_export(session_id: str):
                 "tempo_map_bpm": session["tempo_map_bpm"],
                 "rows_per_pattern": session["rows_per_pattern"],
                 "pattern_rows": session["pattern_rows"],
+                "internal_midi_events": session["internal_midi_events"],
                 "row_times_seconds": session["row_times_seconds"],
                 "sample_rate": session["sample_rate"],
                 "tracks": ATARI_TRACK_NAMES,
