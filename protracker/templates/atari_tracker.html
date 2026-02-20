@@ -701,7 +701,7 @@
       return state.context.decodeAudioData(buf.slice(0));
     }
 
-    async function loadSessionStems(stemUrls) {
+    async function loadSessionStems(stemUrls, mixUrl = "") {
       state.buffers.clear();
       state.gainNodes.clear();
       state.analyserNodes.clear();
@@ -720,10 +720,22 @@
         state.analyserNodes.set(track, analyser);
       }
 
-      await Promise.all(TRACKS.map(async (track) => {
-        const buffer = await decodeStem(stemUrls[track]);
-        state.buffers.set(track, buffer);
-      }));
+      try {
+        await Promise.all(TRACKS.map(async (track) => {
+          const buffer = await decodeStem(stemUrls[track]);
+          state.buffers.set(track, buffer);
+        }));
+      } catch (err) {
+        if (!mixUrl) throw err;
+        const fallback = await decodeStem(mixUrl);
+        TRACKS.forEach((track, idx) => {
+          state.buffers.set(track, fallback);
+          const gain = state.gainNodes.get(track);
+          if (!gain) return;
+          gain.gain.value = idx === 0 ? 1.0 : 0.0;
+        });
+        setStatus("Stem load failed. Playing fallback mix.", "error");
+      }
 
       state.duration = state.buffers.get(TRACKS[0])?.duration || 0;
       state.offset = 0;
@@ -819,7 +831,7 @@
         state.rowTimesSeconds = Array.isArray(data.row_times_seconds) ? data.row_times_seconds : [];
         state.rowsPerPattern = Number.isFinite(data.rows_per_pattern) ? Math.max(1, data.rows_per_pattern) : 64;
         renderPatternWindow(0);
-        await loadSessionStems(data.stem_urls);
+        await loadSessionStems(data.stem_urls, data.mix_url || "");
 
         el.metaSource.textContent = data.source_name || "source.wav";
         el.metaBpm.textContent = String(data.bpm);
